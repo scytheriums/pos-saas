@@ -10,6 +10,11 @@ export async function GET(req: NextRequest) {
         }
         const { tenantId } = authResult.user;
 
+        // If user doesn't have a tenant yet (during onboarding), return 404
+        if (!tenantId) {
+            return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+        }
+
         const tenant = await prisma.tenant.findUnique({
             where: { id: tenantId },
             select: {

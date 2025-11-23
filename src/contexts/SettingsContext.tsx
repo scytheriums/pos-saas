@@ -63,6 +63,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
             const response = await fetch('/api/settings/tenant');
 
+            // If user doesn't have a tenant yet (during onboarding), use defaults
+            if (response.status === 404 || response.status === 401 || response.status === 403) {
+                setSettings(defaultSettings);
+                setLoading(false);
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error('Failed to fetch settings');
             }

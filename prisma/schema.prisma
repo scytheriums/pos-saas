@@ -64,6 +64,24 @@ model Tenant {
   dateFormat String @default("DD/MM/YYYY")
   timeFormat String @default("24h") // "12h" or "24h"
 
+  // Step 1: Business Information
+  businessType String? // "Retail", "Restaurant", "Service", etc.
+  industry     String? // Category/industry
+
+  // Step 2: Contact & Location (address, phone, email, website already exist)
+  city       String?
+  province   String?
+  postalCode String?
+  country    String? @default("Indonesia")
+
+  // Step 3: Tax & Legal (taxId, taxRate already exist)
+  registrationNumber String?
+  legalEntityType    String? // "PT", "CV", "UD", "Perorangan", etc.
+
+  // Onboarding Progress
+  onboardingCompleted Boolean @default(false)
+  onboardingStep      Int     @default(0) // Track progress for resume later
+
   users            User[]
   roles            UserRole[]
   products         Product[]

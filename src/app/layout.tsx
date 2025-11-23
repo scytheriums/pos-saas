@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus POS - Point of Sale System",
+  title: "Awan POS - Point of Sale System",
   description: "Modern cloud-based POS system for retail and restaurants",
 };
 
@@ -26,7 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      signUpFallbackRedirectUrl="/onboarding"
+      signInFallbackRedirectUrl="/dashboard/analytics"
+    >
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}

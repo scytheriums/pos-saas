@@ -1,16 +1,61 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 
 const isPublicRoute = createRouteMatcher([
     '/sign-in(.*)',
     '/sign-up(.*)',
     '/api/webhooks/clerk',
-    '/test-env',  // Allow test page
+    '/',
 ]);
 
-export default clerkMiddleware((auth, request) => {
-    if (!isPublicRoute(request)) {
-        auth.protect();
+const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)']);
+const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/pos(.*)']);
+
+export default clerkMiddleware(async (auth, req) => {
+    const { userId, sessionClaims } = await auth();
+    // Allow public routes
+    if (isPublicRoute(req)) {
+        return NextResponse.next();
     }
+
+    // Redirect to sign-in if not authenticated
+    if (!userId) {
+        const signInUrl = new URL('/sign-in', req.url);
+        signInUrl.searchParams.set('redirect_url', req.url);
+        return NextResponse.redirect(signInUrl);
+    }
+
+    // Check session metadata first (fast path - no API call needed)
+    // This works now that Clerk is configured to include publicMetadata in session token
+    let publicMetadata = sessionClaims?.metadata as { tenantId?: string } | undefined;
+    let hasCompletedOnboarding = !!publicMetadata?.tenantId;
+
+    // If session metadata is undefined, fall back to Clerk API
+    // This handles edge cases where session hasn't synced yet
+    if (!hasCompletedOnboarding) {
+        try {
+            const client = await clerkClient();
+            const user = await client.users.getUser(userId);
+            publicMetadata = user.publicMetadata as { tenantId?: string } | undefined;
+            hasCompletedOnboarding = !!publicMetadata?.tenantId;
+        } catch (error) {
+            console.error('Middleware - Error fetching user from Clerk:', error);
+            // If we can't fetch user, continue with session metadata result
+        }
+    }
+
+    // If accessing protected routes without onboarding, redirect to onboarding
+    if (isProtectedRoute(req) && !hasCompletedOnboarding) {
+        return NextResponse.redirect(new URL('/onboarding', req.url));
+    }
+
+    // If accessing onboarding but already completed, redirect to dashboard
+    if (isOnboardingRoute(req) && hasCompletedOnboarding) {
+        return NextResponse.redirect(new URL('/dashboard/analytics', req.url));
+    }
+
+    return NextResponse.next();
 });
 
 export const config = {

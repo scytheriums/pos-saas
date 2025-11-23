@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useClerk } from "@clerk/nextjs";
 import {
     LayoutDashboard,
     ShoppingCart,
@@ -36,6 +37,7 @@ type MenuItem = {
 export function Sidebar() {
     const pathname = usePathname();
     const { t } = useLanguage();
+    const { signOut } = useClerk();
     const [selectedModule, setSelectedModule] = useState<string | null>(null);
     const [isSecondaryCollapsed, setIsSecondaryCollapsed] = useState(false);
 
@@ -129,7 +131,7 @@ export function Sidebar() {
                 <div className="relative group mt-auto">
                     <button
                         onClick={() => {
-                            window.location.href = '/api/auth/signout';
+                            signOut({ redirectUrl: '/sign-in' });
                         }}
                         className="w-10 h-10 rounded-md flex items-center justify-center transition-colors text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                     >
