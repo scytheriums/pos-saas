@@ -6,12 +6,52 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron:dev": "npx concurrently \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:start": "electron .",
+    "electron:build": "npm run build && electron-builder"
+  },
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.nexuspos.app",
+    "productName": "Nexus POS",
+    "files": [
+      "out/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    }
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.35.4",
+    "@prisma/client": "^5.22.0",
+    "@radix-ui/react-alert-dialog": "^1.1.15",
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-radio-group": "^1.3.8",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@tanstack/react-query": "^5.90.10",
+    "@tanstack/react-virtual": "^3.13.12",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dexie": "^4.2.1",
+    "dexie-react-hooks": "^4.2.0",
+    "lucide-react": "^0.554.0",
     "next": "16.0.3",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "react-hook-form": "^7.66.1",
+    "recharts": "^3.4.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.1.12",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -19,9 +59,17 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.3",
+    "electron-builder": "^26.0.12",
+    "electron-is-dev": "^3.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "prisma": "^5.22.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5",
+    "wait-on": "^9.0.3"
   }
 }

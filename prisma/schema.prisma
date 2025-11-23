@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  products         Product[]
+  categories       Category[]
+  orders           Order[]
+  units            Unit[]
+  stockAdjustments StockAdjustment[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String // Hashed
+  role      Role     @default(CASHIER)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Unit {
+  id           String        @id @default(cuid())
+  name         String // e.g. Box
+  abbreviation String // e.g. bx
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  productUnits ProductUnit[]
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  name     String
+  parentId String? // NULL for root categories
+  tenantId String
+
+  // Relations
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, parentId, tenantId]) // Unique name within same parent and tenant
+  @@index([tenantId])
+  @@index([parentId])
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  minStock    Int     @default(10)
+  categoryId  String?
+  tenantId    String
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Base Unit (e.g. Pcs)
+  baseUnitId String?
+  // Conversions
+  units      ProductUnit[]
+
+  options  ProductOption[]
+  variants ProductVariant[]
+
+  @@index([name])
+}
+
+model ProductUnit {
+  id               String  @id @default(cuid())
+  productId        String
+  product          Product @relation(fields: [productId], references: [id])
+  unitId           String
+  unit             Unit    @relation(fields: [unitId], references: [id])
+  conversionFactor Float // e.g. 12 (1 Box = 12 Base Units)
+}
+
+model ProductOption {
+  id        String               @id @default(cuid())
+  name      String // e.g. Size, Color
+  productId String
+  product   Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values    ProductOptionValue[]
+}
+
+model ProductOptionValue {
+  id       String        @id @default(cuid())
+  value    String // e.g. S, Red
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  variants ProductVariant[] // Implicit many-to-many or explicit? Implicit is fine for now.
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  sku       String  @unique
+  barcode   String? @unique // Specific barcode for this variant
+  price     Decimal
+  stock     Int     @default(0) // Stock in Base Unit
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // The combination of values that make up this variant
+  optionValues ProductOptionValue[]
+
+  orderItems       OrderItem[]
+  stockAdjustments StockAdjustment[]
+
+  @@index([sku])
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  E_WALLET
+  BANK_TRANSFER
+}
+
+enum AdjustmentReason {
+  DAMAGED
+  LOST
+  FOUND
+  SUPPLIER_RETURN
+  MANUAL_COUNT
+  OTHER
+}
+
+model Order {
+  id            String         @id @default(cuid())
+  total         Decimal
+  status        OrderStatus    @default(COMPLETED)
+  paymentMethod PaymentMethod?
+  cashTendered  Decimal?
+  change        Decimal?
+  customerName  String?
+  notes         String?
+  cashierName   String? // For reporting
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  items         OrderItem[]
+  createdAt     DateTime       @default(now())
+}
+
+model OrderItem {
+  id        String         @id @default(cuid())
+  orderId   String
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  quantity  Int
+  price     Decimal // Snapshot of price at time of sale
+}
+
+model StockAdjustment {
+  id               String           @id @default(cuid())
+  productVariantId String
+  variant          ProductVariant   @relation(fields: [productVariantId], references: [id])
+  quantity         Int // Positive for increase, negative for decrease
+  reason           AdjustmentReason
+  notes            String?
+  userId           String
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  createdAt        DateTime         @default(now())
+}
