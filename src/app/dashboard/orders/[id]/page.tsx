@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTenantSettings } from '@/contexts/SettingsContext';
+import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,6 +46,7 @@ interface OrderDetails {
 }
 
 export default function OrderDetailsPage() {
+    const settings = useTenantSettings();
     const params = useParams();
     const router = useRouter();
     const [order, setOrder] = useState<OrderDetails | null>(null);
@@ -91,20 +94,7 @@ export default function OrderDetailsPage() {
         window.print();
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
 
-    const formatDate = (date: string) => {
-        return new Intl.DateTimeFormat('id-ID', {
-            dateStyle: 'long',
-            timeStyle: 'medium',
-        }).format(new Date(date));
-    };
 
     const getStatusBadge = (status: string) => {
         const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -212,7 +202,7 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-sm text-muted-foreground">Date</p>
-                                    <p className="mt-1 font-medium">{formatDate(order.createdAt)}</p>
+                                    <p className="mt-1 font-medium">{formatDateTimeWithSettings(order.createdAt, settings)}</p>
                                 </div>
                                 {order.notes && (
                                     <div className="col-span-2">
@@ -236,22 +226,22 @@ export default function OrderDetailsPage() {
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrency(subtotal)}</span>
+                                <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Tax (11%)</span>
-                                <span>{formatCurrency(tax)}</span>
+                                <span>{formatCurrencyWithSettings(tax, settings)}</span>
                             </div>
                             {order.discountAmount && Number(order.discountAmount) > 0 && (
                                 <div className="flex justify-between text-sm text-green-600">
                                     <span className="text-muted-foreground">Discount</span>
-                                    <span>-{formatCurrency(Number(order.discountAmount))}</span>
+                                    <span>-{formatCurrencyWithSettings(Number(order.discountAmount), settings)}</span>
                                 </div>
                             )}
                             <Separator />
                             <div className="flex justify-between font-bold text-lg">
                                 <span>Total</span>
-                                <span>{formatCurrency(Number(order.total))}</span>
+                                <span>{formatCurrencyWithSettings(Number(order.total), settings)}</span>
                             </div>
                         </CardContent>
                     </Card>
@@ -272,11 +262,11 @@ export default function OrderDetailsPage() {
                                         <p className="text-sm text-muted-foreground">SKU: {item.variant.sku}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-medium">{formatCurrency(Number(item.price))}</p>
+                                        <p className="font-medium">{formatCurrencyWithSettings(Number(item.price), settings)}</p>
                                         <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                                     </div>
                                     <div className="ml-8 text-right min-w-[120px]">
-                                        <p className="font-bold">{formatCurrency(Number(item.price) * item.quantity)}</p>
+                                        <p className="font-bold">{formatCurrencyWithSettings(Number(item.price) * item.quantity, settings)}</p>
                                     </div>
                                 </div>
                             ))}

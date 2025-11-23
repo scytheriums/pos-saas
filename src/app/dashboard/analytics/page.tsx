@@ -5,7 +5,8 @@ import { MetricCard } from '@/components/analytics/MetricCard';
 import { SalesChart } from '@/components/analytics/SalesChart';
 import { LowStockTable } from '@/components/analytics/LowStockTable';
 import { DollarSign, ShoppingCart, TrendingUp } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
+import { useTenantSettings } from '@/contexts/SettingsContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface DailyIncomeData {
@@ -36,6 +37,7 @@ interface LowStockData {
 }
 
 export default function AnalyticsPage() {
+    const settings = useTenantSettings();
     const [dailyIncome, setDailyIncome] = useState<DailyIncomeData | null>(null);
     const [salesTrends, setSalesTrends] = useState<SalesTrendsData | null>(null);
     const [lowStock, setLowStock] = useState<LowStockData | null>(null);
@@ -106,7 +108,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
                 <p className="text-sm text-muted-foreground">
-                    Last updated: {new Date().toLocaleString()}
+                    Last updated: {formatDateTimeWithSettings(new Date(), settings)}
                 </p>
             </div>
 
@@ -114,7 +116,7 @@ export default function AnalyticsPage() {
             <div className="grid gap-4 md:grid-cols-3">
                 <MetricCard
                     title="Total Revenue (Today)"
-                    value={formatCurrency(dailyIncome?.totalRevenue || 0)}
+                    value={formatCurrencyWithSettings(dailyIncome?.totalRevenue || 0, settings)}
                     icon={DollarSign}
                 />
                 <MetricCard
@@ -124,7 +126,7 @@ export default function AnalyticsPage() {
                 />
                 <MetricCard
                     title="Average Order Value"
-                    value={formatCurrency(dailyIncome?.averageOrderValue || 0)}
+                    value={formatCurrencyWithSettings(dailyIncome?.averageOrderValue || 0, settings)}
                     icon={TrendingUp}
                 />
             </div>

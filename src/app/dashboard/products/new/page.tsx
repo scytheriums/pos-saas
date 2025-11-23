@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { VariantMatrixEditor } from '@/components/products/VariantMatrixEditor';
 
 interface VariantData {
+    id: string;
     optionValueIds: string[];
     sku: string;
     price: number;

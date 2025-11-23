@@ -10,6 +10,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
+import { formatCurrencyWithSettings, formatDateWithSettings, formatTimeWithSettings } from '@/lib/format';
+import { TenantSettings } from '@/contexts/SettingsContext';
 
 const localizationFormSchema = z.object({
     language: z.string().default("en"),
@@ -26,7 +28,7 @@ export default function LocalizationSettingsPage() {
     const [saving, setSaving] = useState(false);
 
     const form = useForm<LocalizationFormValues>({
-        resolver: zodResolver(localizationFormSchema),
+        resolver: zodResolver(localizationFormSchema) as any,
         defaultValues: {
             language: "en",
             currency: "IDR",
@@ -85,54 +87,34 @@ export default function LocalizationSettingsPage() {
         }
     };
 
+    // Construct settings object for preview
+    const previewSettings: TenantSettings = {
+        ...watchedValues,
+        name: 'Preview',
+        address: null,
+        phone: null,
+        taxRate: 0.11,
+        receiptHeader: null,
+        receiptFooter: null,
+        showLogo: true,
+        autoPrintReceipt: false,
+        soundEffects: false,
+    };
+
     // Helper function to format date based on selected format
     const formatDatePreview = () => {
-        const now = new Date();
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear();
-
-        switch (watchedValues.dateFormat) {
-            case 'DD/MM/YYYY':
-                return `${day}/${month}/${year}`;
-            case 'MM/DD/YYYY':
-                return `${month}/${day}/${year}`;
-            case 'YYYY-MM-DD':
-                return `${year}-${month}-${day}`;
-            default:
-                return `${day}/${month}/${year}`;
-        }
+        return formatDateWithSettings(new Date(), previewSettings);
     };
 
     // Helper function to format time based on selected format
     const formatTimePreview = () => {
-        const now = new Date();
-        if (watchedValues.timeFormat === '12h') {
-            return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-        } else {
-            return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-        }
+        return formatTimeWithSettings(new Date(), previewSettings);
     };
 
     // Helper function to format currency
     const formatCurrencyPreview = () => {
         const amount = 1234567.89;
-        const currencySymbols: Record<string, string> = {
-            'IDR': 'Rp',
-            'USD': '$',
-            'EUR': '€',
-            'GBP': '£',
-            'JPY': '¥',
-            'SGD': 'S$',
-            'MYR': 'RM',
-        };
-
-        const symbol = currencySymbols[watchedValues.currency] || watchedValues.currency;
-
-        if (watchedValues.currency === 'IDR' || watchedValues.currency === 'JPY') {
-            return `${symbol} ${amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-        }
-        return `${symbol} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return formatCurrencyWithSettings(amount, previewSettings);
     };
 
     if (loading) {

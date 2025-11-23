@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
+import { useTenantSettings } from '@/contexts/SettingsContext';
 
 interface ReceiptItem {
     name: string;
@@ -29,6 +30,7 @@ interface ReceiptProps {
 
 export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
     ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, headerText, footerText, showLogo, isPreview }, ref) => {
+        const settings = useTenantSettings();
         return (
             <div ref={ref} className={isPreview ? "w-full p-4 font-mono text-xs leading-tight text-black bg-white" : "hidden print:block print:w-full print:p-1 print:font-mono print:text-[10px] print:leading-tight text-black bg-white"}>
                 <style type="text/css" media="print">
@@ -57,7 +59,7 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                 <div className="mb-2 text-[9px]">
                     <div className="flex justify-between">
                         <span>Date:</span>
-                        <span>{date.toLocaleString()}</span>
+                        <span>{formatDateTimeWithSettings(date, settings)}</span>
                     </div>
                     <div className="flex justify-between">
                         <span>Order ID:</span>
@@ -87,7 +89,7 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                                         {item.variantName && <div className="text-[8px] text-gray-600">{item.variantName}</div>}
                                     </td>
                                     <td className="py-1 text-right align-top">{item.quantity}</td>
-                                    <td className="py-1 text-right align-top">{formatCurrency(item.price * item.quantity)}</td>
+                                    <td className="py-1 text-right align-top">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -98,21 +100,21 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                 <div className="flex flex-col gap-1 border-b border-black border-dashed mb-4 pb-2">
                     <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>{formatCurrency(subtotal)}</span>
+                        <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span>Tax (11%)</span>
-                        <span>{formatCurrency(tax)}</span>
+                        <span>Tax ({settings.taxRate}%)</span>
+                        <span>{formatCurrencyWithSettings(tax, settings)}</span>
                     </div>
                     {discountAmount && discountAmount > 0 && (
                         <div className="flex justify-between text-green-700">
                             <span>Discount{discountName ? ` (${discountName})` : ''}</span>
-                            <span>-{formatCurrency(discountAmount)}</span>
+                            <span>-{formatCurrencyWithSettings(discountAmount, settings)}</span>
                         </div>
                     )}
                     <div className="flex justify-between font-bold text-sm mt-1">
                         <span>Total</span>
-                        <span>{formatCurrency(total)}</span>
+                        <span>{formatCurrencyWithSettings(total, settings)}</span>
                     </div>
                 </div>
 

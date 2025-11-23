@@ -7,9 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import { formatDateTimeWithSettings } from "@/lib/format";
+import { useTenantSettings } from "@/contexts/SettingsContext";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function StockAdjustmentsPage() {
+    const settings = useTenantSettings();
     const [adjustments, setAdjustments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -86,7 +89,7 @@ export default function StockAdjustmentsPage() {
                                 <TableBody>
                                     {adjustments.map((adj) => (
                                         <TableRow key={adj.id}>
-                                            <TableCell>{new Date(adj.createdAt).toLocaleString()}</TableCell>
+                                            <TableCell>{formatDateTimeWithSettings(adj.createdAt, settings)}</TableCell>
                                             <TableCell className="font-medium">{adj.variant.product.name}</TableCell>
                                             <TableCell>{adj.variant.sku}</TableCell>
                                             <TableCell>

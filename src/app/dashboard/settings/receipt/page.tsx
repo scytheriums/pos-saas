@@ -28,7 +28,7 @@ export default function ReceiptSettingsPage() {
     const receiptRef = useRef<HTMLDivElement>(null);
 
     const form = useForm<ReceiptFormValues>({
-        resolver: zodResolver(receiptFormSchema),
+        resolver: zodResolver(receiptFormSchema) as any,
         defaultValues: {
             receiptHeader: "",
             receiptFooter: "",

@@ -1,4 +1,4 @@
-async function main() {
+async function debugProduct() {
     try {
         const response = await fetch("http://localhost:3000/api/products");
         if (!response.ok) {
@@ -26,4 +26,4 @@ async function main() {
     }
 }
 
-main();
+debugProduct();

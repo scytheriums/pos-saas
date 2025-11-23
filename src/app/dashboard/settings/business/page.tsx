@@ -29,7 +29,7 @@ export default function BusinessProfilePage() {
     const [saving, setSaving] = useState(false);
 
     const form = useForm<BusinessFormValues>({
-        resolver: zodResolver(businessFormSchema),
+        resolver: zodResolver(businessFormSchema) as any,
         defaultValues: {
             name: "",
             address: "",

@@ -2,7 +2,8 @@
 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrencyWithSettings, formatDateWithSettings } from '@/lib/format';
+import { useTenantSettings } from '@/contexts/SettingsContext';
 
 interface SalesData {
     date: string;
@@ -16,6 +17,7 @@ interface SalesChartProps {
 }
 
 export function SalesChart({ data, title = "Sales Trends" }: SalesChartProps) {
+    const settings = useTenantSettings();
     // Format currency for tooltip
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
@@ -23,7 +25,7 @@ export function SalesChart({ data, title = "Sales Trends" }: SalesChartProps) {
                 <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
                     <p className="text-sm font-medium mb-1">{payload[0].payload.date}</p>
                     <p className="text-sm text-purple-600">
-                        Revenue: {formatCurrency(payload[0].value)}
+                        Revenue: {formatCurrencyWithSettings(payload[0].value, settings)}
                     </p>
                     <p className="text-sm text-blue-600">
                         Orders: {payload[1].value}
@@ -47,8 +49,7 @@ export function SalesChart({ data, title = "Sales Trends" }: SalesChartProps) {
                             dataKey="date"
                             className="text-xs"
                             tickFormatter={(value) => {
-                                const date = new Date(value);
-                                return `${date.getMonth() + 1}/${date.getDate()}`;
+                                return formatDateWithSettings(value, settings);
                             }}
                         />
                         <YAxis yAxisId="left" className="text-xs" />

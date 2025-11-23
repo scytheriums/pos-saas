@@ -51,7 +51,7 @@ export default function OnboardingPage() {
                     tenantName: businessName,
                     role: 'owner',
                 },
-            });
+            } as any);
 
             // Redirect to dashboard
             router.push('/dashboard');

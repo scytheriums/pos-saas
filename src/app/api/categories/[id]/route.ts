@@ -11,7 +11,7 @@ async function wouldCreateCircularReference(categoryId: string, newParentId: str
             return true; // Circular reference detected
         }
 
-        const parent = await prisma.category.findFirst({
+        const parent: { parentId: string | null } | null = await prisma.category.findFirst({
             where: { id: currentId, tenantId },
             select: { parentId: true }
         });

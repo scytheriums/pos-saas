@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrencyWithSettings, formatDateWithSettings } from "@/lib/format";
+import { useTenantSettings } from "@/contexts/SettingsContext";
 import { CustomerDialog } from "@/components/customers/CustomerDialog";
 import {
     AlertDialog,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function CustomerDetailPage() {
+    const settings = useTenantSettings();
     const params = useParams();
     const router = useRouter();
     const customerId = params.id as string;
@@ -149,7 +151,7 @@ export default function CustomerDetailPage() {
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Total Spent</p>
-                            <p className="text-2xl font-bold text-green-600">{formatCurrency(customer.totalSpent)}</p>
+                            <p className="text-2xl font-bold text-green-600">{formatCurrencyWithSettings(customer.totalSpent, settings)}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -165,7 +167,7 @@ export default function CustomerDetailPage() {
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Member Since</p>
-                            <p className="font-medium">{new Date(customer.createdAt).toLocaleDateString()}</p>
+                            <p className="font-medium">{formatDateWithSettings(customer.createdAt, settings)}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -197,8 +199,8 @@ export default function CustomerDetailPage() {
                                                     {order.id.slice(0, 8)}...
                                                 </Link>
                                             </TableCell>
-                                            <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(order.total)}</TableCell>
+                                            <TableCell>{formatDateWithSettings(order.createdAt, settings)}</TableCell>
+                                            <TableCell className="text-right">{formatCurrencyWithSettings(order.total, settings)}</TableCell>
                                             <TableCell>
                                                 <Badge variant={getStatusColor(order.status) as any}>
                                                     {order.status}

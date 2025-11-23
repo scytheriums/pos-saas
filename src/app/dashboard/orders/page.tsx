@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTenantSettings } from '@/contexts/SettingsContext';
+import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +29,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
+    const settings = useTenantSettings();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -87,20 +90,7 @@ export default function OrdersPage() {
         return <Badge variant="outline">{labels[method] || method}</Badge>;
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
 
-    const formatDate = (date: string) => {
-        return new Intl.DateTimeFormat('id-ID', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-        }).format(new Date(date));
-    };
 
     return (
         <div className="p-6 space-y-6">
@@ -229,12 +219,12 @@ export default function OrdersPage() {
                                         <TableCell className="font-mono text-sm">
                                             {order.id.slice(0, 8)}...
                                         </TableCell>
-                                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                                        <TableCell>{formatDateTimeWithSettings(order.createdAt, settings)}</TableCell>
                                         <TableCell>
                                             {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
                                         </TableCell>
                                         <TableCell>{order.items.length} items</TableCell>
-                                        <TableCell className="font-semibold">{formatCurrency(Number(order.total))}</TableCell>
+                                        <TableCell className="font-semibold">{formatCurrencyWithSettings(Number(order.total), settings)}</TableCell>
                                         <TableCell>{getPaymentMethodBadge(order.paymentMethod)}</TableCell>
                                         <TableCell>{getStatusBadge(order.status)}</TableCell>
                                         <TableCell>

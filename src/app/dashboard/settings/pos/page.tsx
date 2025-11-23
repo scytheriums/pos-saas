@@ -25,7 +25,7 @@ export default function PosSettingsPage() {
     const [saving, setSaving] = useState(false);
 
     const form = useForm<PosFormValues>({
-        resolver: zodResolver(posFormSchema),
+        resolver: zodResolver(posFormSchema) as any,
         defaultValues: {
             autoPrintReceipt: true,
             soundEffects: true,

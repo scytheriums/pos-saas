@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
                     name,
                     description,
                     minStock: minStock || 10,
-                    category: categoryId ? { connect: { id: categoryId } } : undefined,
+                    categoryId: categoryId || null,
                     tenantId,
                 },
             });

@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient({});
 
@@ -15,21 +15,51 @@ async function main() {
 
     console.log('Created Tenant:', tenant.name);
 
-    // 2. Create Admin User
+    // 2. Create Roles
+    const adminRole = await prisma.userRole.upsert({
+        where: { tenantId_name: { tenantId: tenant.id, name: 'Owner' } },
+        update: {},
+        create: {
+            name: 'Owner',
+            description: 'Full access to everything',
+            tenantId: tenant.id,
+            isDefault: false,
+        },
+    });
+
+    const cashierRole = await prisma.userRole.upsert({
+        where: { tenantId_name: { tenantId: tenant.id, name: 'Cashier' } },
+        update: {},
+        create: {
+            name: 'Cashier',
+            description: 'Process sales and view orders',
+            tenantId: tenant.id,
+            isDefault: true,
+        },
+    });
+
+    console.log('Created Roles:', adminRole.name, cashierRole.name);
+
+    // 3. Create Admin User
     const adminEmail = 'admin@example.com';
-    const admin = await prisma.user.upsert({
-        where: { email: adminEmail },
+
+
+    // Actually, upsert requires a unique constraint.
+    // User model: clerkUserId is unique.
+
+    const adminUser = await prisma.user.upsert({
+        where: { clerkUserId: 'user_admin_mock' },
         update: {},
         create: {
             email: adminEmail,
             name: 'Admin User',
-            role: Role.ADMIN,
+            clerkUserId: 'user_admin_mock',
+            roleId: adminRole.id,
             tenantId: tenant.id,
-            password: 'hashed_password_placeholder', // In real app, hash this
         },
     });
 
-    console.log('Created Admin User:', admin.email);
+    console.log('Created Admin User:', adminUser.email);
 }
 
 main()

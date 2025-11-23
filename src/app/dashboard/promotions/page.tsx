@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, ChevronLeft, ChevronRight, Plus, Edit, Trash2 } from "lucide-react";
 import { DiscountDialog } from "@/components/promotions/DiscountDialog";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrencyWithSettings } from "@/lib/format";
+import { useTenantSettings } from "@/contexts/SettingsContext";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function PromotionsPage() {
+    const settings = useTenantSettings();
     const [discounts, setDiscounts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -100,7 +102,7 @@ export default function PromotionsPage() {
         if (discount.type === 'PERCENTAGE') {
             return `${discount.value}%`;
         }
-        return formatCurrency(discount.value);
+        return formatCurrencyWithSettings(discount.value, settings);
     };
 
     const isExpired = (discount: any) => {

@@ -14,12 +14,49 @@ import Link from "next/link";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { VariantSelector } from "@/components/pos/VariantSelector";
 import { cn } from "@/lib/utils";
-import { formatCurrencyWithSettings } from "@/lib/format";
+import { formatCurrencyWithSettings, formatTimeWithSettings, formatDateWithSettings } from "@/lib/format";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTenantSettings } from "@/contexts/SettingsContext";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
+
+// Sound effect helper
+const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
+    if (!settings.soundEffects) return;
+
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    if (type === 'success') {
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+        oscillator.frequency.exponentialRampToValueAtTime(1760, audioContext.currentTime + 0.1); // A6
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } else if (type === 'error') {
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(220, audioContext.currentTime); // A3
+        oscillator.frequency.linearRampToValueAtTime(110, audioContext.currentTime + 0.2); // A2
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.2);
+    } else if (type === 'click') {
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.05);
+    }
+};
 
 type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string };
 type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: number };
@@ -178,6 +215,7 @@ export default function POSPage() {
             }
             return [...prev, itemToAdd];
         });
+        playSound('click', settings);
     };
 
     const handleProductClick = (product: any) => {
@@ -211,10 +249,12 @@ export default function POSPage() {
             }
         }
         alert(`Product not found: ${code}`);
+        playSound('error', settings);
     });
 
     const removeFromCart = (cartItemId: string) => {
         setCart((prev) => prev.filter((item) => (item.variantId || item.id) !== cartItemId));
+        playSound('click', settings);
     };
 
     const updateQuantity = (cartItemId: string, delta: number) => {
@@ -250,12 +290,14 @@ export default function POSPage() {
                 const data = await res.json();
                 setAppliedDiscount(data.discount);
                 setDiscountAmount(data.discountAmount);
+                playSound('success', settings);
                 // alert(`Discount applied: ${data.discount.name}`); // Removed alert for better UX
             } else {
                 const error = await res.json();
                 setDiscountError(error.error || 'Invalid discount code');
                 setAppliedDiscount(null);
                 setDiscountAmount(0);
+                playSound('error', settings);
             }
         } catch (error) {
             console.error('Failed to validate discount', error);
@@ -324,9 +366,12 @@ export default function POSPage() {
             discountName: appliedDiscount?.name
         });
 
-        setTimeout(() => {
-            window.print();
-        }, 500);
+        if (settings.autoPrintReceipt) {
+            setTimeout(() => {
+                window.print();
+            }, 500);
+        }
+        playSound('success', settings);
 
         alert(isOffline ? 'Order saved offline! It will sync when online.' : `Order ${orderId} completed successfully!`);
 
@@ -417,7 +462,7 @@ export default function POSPage() {
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full text-sm font-medium text-gray-600">
                             <Clock className="w-4 h-4" />
-                            <span>{new Date().toLocaleTimeString()}</span>
+                            <span>{formatTimeWithSettings(new Date(), settings)}</span>
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => setLanguage(language === 'en' ? 'id' : 'en')}>
                             <Globe className="w-4 h-4" />
@@ -527,7 +572,7 @@ export default function POSPage() {
                                                     {heldCarts.map((held) => (
                                                         <div key={held.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                                                             <div>
-                                                                <div className="font-medium">{new Date(held.timestamp).toLocaleTimeString()}</div>
+                                                                <div className="font-medium">{formatTimeWithSettings(held.timestamp, settings)}</div>
                                                                 <div className="text-sm text-gray-500">{held.items.length} items • {formatCurrencyWithSettings(held.total, settings)}</div>
                                                             </div>
                                                             <div className="flex gap-2">

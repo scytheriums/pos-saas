@@ -37,8 +37,8 @@ export function formatCurrency(amount: number, currency: string = 'IDR'): string
 /**
  * Format a date according to the specified format
  */
-export function formatDate(date: Date | string, format: string = 'DD/MM/YYYY'): string {
-    const d = typeof date === 'string' ? new Date(date) : date;
+export function formatDate(date: Date | string | number, format: string = 'DD/MM/YYYY'): string {
+    const d = new Date(date);
 
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -59,8 +59,8 @@ export function formatDate(date: Date | string, format: string = 'DD/MM/YYYY'): 
 /**
  * Format a time according to the specified format (12h or 24h)
  */
-export function formatTime(date: Date | string, format: string = '24h'): string {
-    const d = typeof date === 'string' ? new Date(date) : date;
+export function formatTime(date: Date | string | number, format: string = '24h'): string {
+    const d = new Date(date);
 
     if (format === '12h') {
         return d.toLocaleTimeString('en-US', {
@@ -80,7 +80,7 @@ export function formatTime(date: Date | string, format: string = '24h'): string 
  * Format a complete date and time
  */
 export function formatDateTime(
-    date: Date | string,
+    date: Date | string | number,
     dateFormat: string = 'DD/MM/YYYY',
     timeFormat: string = '24h'
 ): string {
@@ -93,8 +93,8 @@ export function formatDateTime(
  * Convert a date to a specific timezone (simplified version)
  * For production, consider using a library like date-fns-tz or luxon
  */
-export function convertToTimezone(date: Date | string, timezone: string): Date {
-    const d = typeof date === 'string' ? new Date(date) : date;
+export function convertToTimezone(date: Date | string | number, timezone: string): Date {
+    const d = new Date(date);
 
     // For now, return the date as-is
     // In production, you'd use a proper timezone library
@@ -118,7 +118,7 @@ export function formatCurrencyWithSettings(amount: number, settings: TenantSetti
 /**
  * Format date using tenant settings
  */
-export function formatDateWithSettings(date: Date | string, settings: TenantSettings): string {
+export function formatDateWithSettings(date: Date | string | number, settings: TenantSettings): string {
     const converted = convertToTimezone(date, settings.timezone);
     return formatDate(converted, settings.dateFormat);
 }
@@ -126,7 +126,7 @@ export function formatDateWithSettings(date: Date | string, settings: TenantSett
 /**
  * Format time using tenant settings
  */
-export function formatTimeWithSettings(date: Date | string, settings: TenantSettings): string {
+export function formatTimeWithSettings(date: Date | string | number, settings: TenantSettings): string {
     const converted = convertToTimezone(date, settings.timezone);
     return formatTime(converted, settings.timeFormat);
 }
@@ -134,7 +134,7 @@ export function formatTimeWithSettings(date: Date | string, settings: TenantSett
 /**
  * Format date and time using tenant settings
  */
-export function formatDateTimeWithSettings(date: Date | string, settings: TenantSettings): string {
+export function formatDateTimeWithSettings(date: Date | string | number, settings: TenantSettings): string {
     const converted = convertToTimezone(date, settings.timezone);
     return formatDateTime(converted, settings.dateFormat, settings.timeFormat);
 }
