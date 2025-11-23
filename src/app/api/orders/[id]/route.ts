@@ -4,8 +4,9 @@ import { getAuthUser } from "@/lib/auth";
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    props: { params: Promise<{ id: string }> }
 ) {
+    const params = await props.params;
     try {
         // Get authenticated user and tenant
         const authResult = await getAuthUser();
@@ -13,10 +14,10 @@ export async function GET(
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
         const { tenantId } = authResult.user;
-
+        const { id } = params;
         const order = await prisma.order.findFirst({
             where: {
-                id: params.id,
+                id: id,
                 tenantId, // Ensure user can only access their tenant's orders
             },
             include: {
@@ -32,7 +33,9 @@ export async function GET(
                             }
                         }
                     }
-                }
+                },
+                discount: true,
+                customer: true
             }
         });
 

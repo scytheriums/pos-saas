@@ -20,6 +20,9 @@ export interface OfflineOrder {
     cashTendered?: number;
     change?: number;
     customerName?: string;
+    customerId?: string;
+    discountId?: string;
+    discountAmount?: number;
 }
 
 export class POSDatabase extends Dexie {
@@ -28,9 +31,15 @@ export class POSDatabase extends Dexie {
 
     constructor() {
         super('NexusPOS_DB');
-        this.version(1).stores({
+        this.version(2).stores({
             products: 'id, category', // Primary key and indexed props
             orders: '++id, timestamp, synced' // Auto-increment primary key
+        }).upgrade(tx => {
+            // Upgrade logic if needed, but adding optional fields usually doesn't require data migration for existing rows
+        });
+        this.version(1).stores({
+            products: 'id, category',
+            orders: '++id, timestamp, synced'
         });
     }
 }

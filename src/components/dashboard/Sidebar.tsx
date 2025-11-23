@@ -17,7 +17,10 @@ import {
     ChevronLeft,
     ChevronRight,
     FileText,
-    ClipboardList
+    ClipboardList,
+    Percent,
+    Globe,
+    Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -49,13 +52,18 @@ export function Sidebar() {
             ]
         },
         { icon: Store, label: t.sidebar.orders, href: "/dashboard/orders" },
+        { icon: Percent, label: "Promotions", href: "/dashboard/promotions" },
         {
             icon: Settings,
             label: t.sidebar.settings,
             children: [
+                { label: "Business Profile", href: "/dashboard/settings/business", icon: Store },
+                { label: "Receipt Settings", href: "/dashboard/settings/receipt", icon: FileText },
+                { label: "POS Settings", href: "/dashboard/settings/pos", icon: Settings },
+                { label: "Localization", href: "/dashboard/settings/localization", icon: Globe },
                 { label: t.sidebar.customers, href: "/dashboard/customers", icon: Users },
                 { label: t.sidebar.team, href: "/dashboard/users", icon: UserCog },
-                { label: "General", href: "/dashboard/settings", icon: Settings },
+                { label: "Roles & Permissions", href: "/dashboard/settings/roles", icon: Shield },
             ]
         },
     ];

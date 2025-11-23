@@ -5,8 +5,9 @@ import { getAuthUser } from '@/lib/auth';
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string; variantId: string } }
+    props: { params: Promise<{ id: string; variantId: string }> }
 ) {
+    const params = await props.params;
     try {
         const authResult = await getAuthUser();
         if ('error' in authResult) {
@@ -45,8 +46,9 @@ export async function GET(
 
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string; variantId: string } }
+    props: { params: Promise<{ id: string; variantId: string }> }
 ) {
+    const params = await props.params;
     try {
         const authResult = await getAuthUser();
         if ('error' in authResult) {

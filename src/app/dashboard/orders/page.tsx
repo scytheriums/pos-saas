@@ -16,6 +16,11 @@ interface Order {
     status: 'PENDING' | 'COMPLETED' | 'REFUNDED' | 'CANCELLED';
     paymentMethod: 'CASH' | 'CARD' | 'E_WALLET' | 'BANK_TRANSFER' | null;
     customerName: string | null;
+    customer?: {
+        name: string;
+        email?: string;
+        phone?: string;
+    } | null;
     cashierName: string | null;
     createdAt: string;
     items: any[];
@@ -226,7 +231,7 @@ export default function OrdersPage() {
                                         </TableCell>
                                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                                         <TableCell>
-                                            {order.customerName || <span className="text-muted-foreground">Walk-in</span>}
+                                            {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
                                         </TableCell>
                                         <TableCell>{order.items.length} items</TableCell>
                                         <TableCell className="font-semibold">{formatCurrency(Number(order.total))}</TableCell>

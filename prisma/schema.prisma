@@ -11,10 +11,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  MANAGER
-  CASHIER
+// RBAC Enums
+enum PermissionAction {
+  VIEW
+  CREATE
+  EDIT
+  DELETE
+  MANAGE // Full control
+}
+
+enum PermissionResource {
+  PRODUCTS
+  INVENTORY
+  ORDERS
+  CUSTOMERS
+  DISCOUNTS
+  CATEGORIES
+  ANALYTICS
+  USERS
+  SETTINGS
 }
 
 model Tenant {
@@ -25,24 +40,57 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Business Profile
+  email   String?
+  website String?
+  taxId   String?
+  taxRate Decimal @default(0)
+
+  // Receipt Settings
+  receiptHeader String?
+  receiptFooter String?
+  showLogo      Boolean @default(true)
+  logoUrl       String?
+
+  // POS Settings
+  autoPrintReceipt Boolean @default(true)
+  soundEffects     Boolean @default(true)
+  barcodeScanner   String? // Scanner type/config
+
+  // Localization Settings
+  language   String @default("en")
+  currency   String @default("IDR")
+  timezone   String @default("Asia/Jakarta")
+  dateFormat String @default("DD/MM/YYYY")
+  timeFormat String @default("24h") // "12h" or "24h"
+
   users            User[]
+  roles            UserRole[]
   products         Product[]
   categories       Category[]
   orders           Order[]
   units            Unit[]
   stockAdjustments StockAdjustment[]
+  customers        Customer[]
+  discounts        Discount[]
+  auditLogs        AuditLog[]
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String // Hashed
-  role      Role     @default(CASHIER)
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String     @id @default(cuid())
+  clerkUserId String     @unique // Link to Clerk user
+  email       String
+  name        String?
+  roleId      String?
+  role        UserRole?  @relation(fields: [roleId], references: [id])
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  auditLogs   AuditLog[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@index([clerkUserId])
 }
 
 model Unit {
@@ -179,7 +227,12 @@ model Order {
   tenantId      String
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   items         OrderItem[]
-  createdAt     DateTime       @default(now())
+  customerId    String?
+  customer       Customer?      @relation(fields: [customerId], references: [id])
+  discountId     String?
+  discount       Discount?      @relation(fields: [discountId], references: [id])
+  discountAmount Decimal?
+  createdAt      DateTime       @default(now())
 }
 
 model OrderItem {
@@ -203,4 +256,94 @@ model StockAdjustment {
   tenantId         String
   tenant           Tenant           @relation(fields: [tenantId], references: [id])
   createdAt        DateTime         @default(now())
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?  @unique
+  email     String?
+  address   String?
+  points    Int      @default(0)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([phone])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model Discount {
+  id          String        @id @default(cuid())
+  name        String
+  code        String?       @unique  // Optional coupon code
+  type        DiscountType
+  value       Decimal       // Percentage or fixed amount
+  minPurchase Decimal?      // Minimum purchase required
+  maxDiscount Decimal?      // Max discount for percentage type
+  startDate   DateTime?
+  endDate     DateTime?
+  active      Boolean       @default(true)
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  orders      Order[]       // Track which orders used this discount
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([code])
+  @@index([active])
+}
+
+// RBAC Models
+model UserRole {
+  id          String       @id @default(cuid())
+  name        String       // e.g., "Admin", "Manager", "Cashier"
+  description String?
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  permissions Permission[]
+  users       User[]
+  isDefault   Boolean      @default(false) // Default role for new users
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Permission {
+  id       String             @id @default(cuid())
+  action   PermissionAction
+  resource PermissionResource
+  roleId   String
+  role     UserRole           @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, action, resource])
+  @@index([roleId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  action     String   // e.g., "CREATE", "UPDATE", "DELETE"
+  resource   String   // e.g., "Product", "Order", "Customer"
+  resourceId String?  // ID of the affected resource
+  details    Json?    // Additional context
+  ipAddress  String?
+  timestamp  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([timestamp])
 }

@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
             select: {
                 name: true,
                 address: true,
-                phone: true
+                phone: true,
+                taxRate: true,
+                receiptHeader: true,
+                receiptFooter: true,
+                showLogo: true
             }
         });
 

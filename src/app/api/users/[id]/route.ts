@@ -4,8 +4,9 @@ import { clerkClient } from '@clerk/nextjs/server';
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    props: { params: Promise<{ id: string }> }
 ) {
+    const params = await props.params;
     try {
         // Get authenticated user
         const authResult = await getAuthUser();

@@ -19,12 +19,18 @@ interface ReceiptProps {
     subtotal: number;
     tax: number;
     total: number;
+    discountAmount?: number;
+    discountName?: string;
+    headerText?: string;
+    footerText?: string;
+    showLogo?: boolean;
+    isPreview?: boolean;
 }
 
 export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
-    ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total }, ref) => {
+    ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, headerText, footerText, showLogo, isPreview }, ref) => {
         return (
-            <div ref={ref} className="hidden print:block print:w-full print:p-1 print:font-mono print:text-[10px] print:leading-tight text-black bg-white">
+            <div ref={ref} className={isPreview ? "w-full p-4 font-mono text-xs leading-tight text-black bg-white" : "hidden print:block print:w-full print:p-1 print:font-mono print:text-[10px] print:leading-tight text-black bg-white"}>
                 <style type="text/css" media="print">
                     {`
                         @page { size: 58mm auto; margin: 0mm; }
@@ -33,9 +39,18 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                 </style>
                 {/* Header */}
                 <div className="text-center mb-4 border-b border-black pb-2 border-dashed">
+                    {showLogo && (
+                        <div className="mb-2 flex justify-center">
+                            {/* Placeholder for Logo - in real app would be an img tag */}
+                            <div className="h-8 w-8 bg-black rounded-full flex items-center justify-center text-white text-[8px] font-bold">
+                                LOGO
+                            </div>
+                        </div>
+                    )}
                     <h1 className="font-bold text-lg mb-1">{storeName}</h1>
                     {storeAddress && <p>{storeAddress}</p>}
                     {storePhone && <p>{storePhone}</p>}
+                    {headerText && <p className="mt-2 whitespace-pre-wrap">{headerText}</p>}
                 </div>
 
                 {/* Transaction Details */}
@@ -89,6 +104,12 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                         <span>Tax (11%)</span>
                         <span>{formatCurrency(tax)}</span>
                     </div>
+                    {discountAmount && discountAmount > 0 && (
+                        <div className="flex justify-between text-green-700">
+                            <span>Discount{discountName ? ` (${discountName})` : ''}</span>
+                            <span>-{formatCurrency(discountAmount)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between font-bold text-sm mt-1">
                         <span>Total</span>
                         <span>{formatCurrency(total)}</span>
@@ -97,8 +118,14 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
 
                 {/* Footer */}
                 <div className="text-center text-[9px]">
-                    <p className="mb-1">Thank you for your purchase!</p>
-                    <p>Please come again.</p>
+                    {footerText ? (
+                        <p className="mb-1 whitespace-pre-wrap">{footerText}</p>
+                    ) : (
+                        <>
+                            <p className="mb-1">Thank you for your purchase!</p>
+                            <p>Please come again.</p>
+                        </>
+                    )}
                     <div className="mt-4 flex justify-center">
                         {/* Placeholder for Barcode/QR if needed */}
                         <div className="h-8 w-48 bg-black/10 flex items-center justify-center text-[8px]">

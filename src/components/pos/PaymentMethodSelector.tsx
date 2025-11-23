@@ -13,9 +13,10 @@ interface PaymentMethodSelectorProps {
     onClose: () => void;
     total: number;
     onConfirm: (paymentMethod: string, cashTendered?: number, customerName?: string) => void;
+    selectedCustomer?: { id: string; name: string; email?: string } | null;
 }
 
-export function PaymentMethodSelector({ open, onClose, total, onConfirm }: PaymentMethodSelectorProps) {
+export function PaymentMethodSelector({ open, onClose, total, onConfirm, selectedCustomer }: PaymentMethodSelectorProps) {
     const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
     const [cashTendered, setCashTendered] = useState<string>('');
     const [customerName, setCustomerName] = useState<string>('');
@@ -37,9 +38,9 @@ export function PaymentMethodSelector({ open, onClose, total, onConfirm }: Payme
                 alert('Cash tendered must be greater than or equal to total');
                 return;
             }
-            onConfirm(paymentMethod, cashAmount, customerName);
+            onConfirm(paymentMethod, cashAmount, selectedCustomer?.name);
         } else {
-            onConfirm(paymentMethod, undefined, customerName);
+            onConfirm(paymentMethod, undefined, selectedCustomer?.name);
         }
     };
 
@@ -68,16 +69,18 @@ export function PaymentMethodSelector({ open, onClose, total, onConfirm }: Payme
                 </DialogHeader>
 
                 <div className="space-y-6">
-                    {/* Customer Name (Optional) */}
-                    <div className="space-y-2">
-                        <Label htmlFor="customerName">Customer Name (Optional)</Label>
-                        <Input
-                            id="customerName"
-                            placeholder="Enter customer name"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                        />
-                    </div>
+                    {/* Customer Info (Read-only if selected) */}
+                    {selectedCustomer && (
+                        <div className="space-y-2">
+                            <Label>Customer</Label>
+                            <div className="px-3 py-2 border rounded-md bg-muted/50">
+                                <div className="font-medium">{selectedCustomer.name}</div>
+                                {selectedCustomer.email && (
+                                    <div className="text-sm text-muted-foreground">{selectedCustomer.email}</div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Payment Method Selection */}
                     <div className="space-y-3">

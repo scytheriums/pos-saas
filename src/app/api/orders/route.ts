@@ -58,6 +58,13 @@ export async function GET(req: NextRequest) {
                     status: true,
                     paymentMethod: true,
                     customerName: true,
+                    customer: {
+                        select: {
+                            name: true,
+                            email: true,
+                            phone: true
+                        }
+                    },
                     cashierName: true,
                     notes: true,
                     items: {
@@ -108,10 +115,10 @@ export async function POST(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-        const { tenantId } = authResult.user;
+        const { tenantId, name: cashierName } = authResult.user;
 
         const body = await req.json();
-        const { items, total, paymentMethod, cashTendered, change, customerName } = body;
+        const { items, total, paymentMethod, cashTendered, change, customerName, customerId, discountId, discountAmount } = body;
 
         if (!items || items.length === 0) {
             return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
@@ -177,6 +184,10 @@ export async function POST(req: NextRequest) {
                     cashTendered: cashTendered ? new Prisma.Decimal(cashTendered) : null,
                     change: change ? new Prisma.Decimal(change) : null,
                     customerName: customerName,
+                    cashierName: cashierName || "Unknown Cashier",
+                    customerId: customerId || null,
+                    discountId: discountId || null,
+                    discountAmount: discountAmount ? new Prisma.Decimal(discountAmount) : new Prisma.Decimal(0),
                     items: {
                         create: items.map((item: any) => ({
                             variantId: item.variantId || item.id,

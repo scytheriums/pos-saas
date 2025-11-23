@@ -9,15 +9,27 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Printer, FileText } from 'lucide-react';
 import Link from 'next/link';
 
+import { ReceiptTemplate } from '@/components/pos/ReceiptTemplate';
+import { useRef } from 'react';
+
 interface OrderDetails {
     id: string;
     total: number;
     status: string;
     paymentMethod: string | null;
     customerName: string | null;
+    customer?: {
+        name: string;
+        email?: string;
+        phone?: string;
+    } | null;
     cashierName: string | null;
     notes: string | null;
     createdAt: string;
+    discountAmount: number | null;
+    discount?: {
+        name: string;
+    };
     items: {
         id: string;
         quantity: number;
@@ -36,18 +48,34 @@ export default function OrderDetailsPage() {
     const router = useRouter();
     const [order, setOrder] = useState<OrderDetails | null>(null);
     const [loading, setLoading] = useState(true);
+    const [tenant, setTenant] = useState<any>(null);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (params.id) {
             fetchOrder(params.id as string);
         }
+        fetchTenant();
     }, [params.id]);
+
+    const fetchTenant = async () => {
+        try {
+            const res = await fetch('/api/tenant/me');
+            if (res.ok) {
+                const data = await res.json();
+                setTenant(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch tenant details", error);
+        }
+    };
 
     const fetchOrder = async (id: string) => {
         try {
             const res = await fetch(`/api/orders/${id}`);
             if (res.ok) {
                 const data = await res.json();
+                console.log(data)
                 setOrder(data);
             } else {
                 console.error('Order not found');
@@ -57,6 +85,10 @@ export default function OrderDetailsPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePrint = () => {
+        window.print();
     };
 
     const formatCurrency = (amount: number) => {
@@ -121,120 +153,162 @@ export default function OrderDetailsPage() {
         );
     }
 
+    // Calculate subtotal and tax for receipt
+    const subtotal = order.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+    const taxRate = (tenant?.taxRate || 11) / 100; // Convert percentage to decimal
+    const tax = subtotal * taxRate;
+
     return (
         <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link href="/dashboard/orders">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
+            <div className="print:hidden space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link href="/dashboard/orders">
+                            <Button variant="ghost" size="icon">
+                                <ArrowLeft className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-3xl font-bold">Order Details</h1>
+                            <p className="text-muted-foreground">Order ID: {order.id}</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handlePrint}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Reprint Receipt
                         </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold">Order Details</h1>
-                        <p className="text-muted-foreground">Order ID: {order.id}</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline">
-                        <Printer className="mr-2 h-4 w-4" />
-                        Reprint Receipt
-                    </Button>
-                </div>
-            </div>
 
-            <div className="grid gap-6 md:grid-cols-3">
-                {/* Order Information */}
-                <Card className="md:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Order Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-sm text-muted-foreground">Status</p>
-                                <div className="mt-1">{getStatusBadge(order.status)}</div>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Payment Method</p>
-                                <p className="mt-1 font-medium">{getPaymentLabel(order.paymentMethod)}</p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Customer</p>
-                                <p className="mt-1 font-medium">
-                                    {order.customerName || <span className="text-muted-foreground">Walk-in</span>}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Cashier</p>
-                                <p className="mt-1 font-medium">
-                                    {order.cashierName || <span className="text-muted-foreground">-</span>}
-                                </p>
-                            </div>
-                            <div className="col-span-2">
-                                <p className="text-sm text-muted-foreground">Date</p>
-                                <p className="mt-1 font-medium">{formatDate(order.createdAt)}</p>
-                            </div>
-                            {order.notes && (
+                <div className="grid gap-6 md:grid-cols-3">
+                    {/* Order Information */}
+                    <Card className="md:col-span-2">
+                        <CardHeader>
+                            <CardTitle>Order Information</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Status</p>
+                                    <div className="mt-1">{getStatusBadge(order.status)}</div>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Payment Method</p>
+                                    <p className="mt-1 font-medium">{getPaymentLabel(order.paymentMethod)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Customer</p>
+                                    <p className="mt-1 font-medium">
+                                        {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Cashier</p>
+                                    <p className="mt-1 font-medium">
+                                        {order.cashierName || <span className="text-muted-foreground">-</span>}
+                                    </p>
+                                </div>
                                 <div className="col-span-2">
-                                    <p className="text-sm text-muted-foreground">Notes</p>
-                                    <p className="mt-1">{order.notes}</p>
+                                    <p className="text-sm text-muted-foreground">Date</p>
+                                    <p className="mt-1 font-medium">{formatDate(order.createdAt)}</p>
+                                </div>
+                                {order.notes && (
+                                    <div className="col-span-2">
+                                        <p className="text-sm text-muted-foreground">Notes</p>
+                                        <p className="mt-1">{order.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Order Summary */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Items</span>
+                                <span>{order.items.length}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Subtotal</span>
+                                <span>{formatCurrency(subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Tax (11%)</span>
+                                <span>{formatCurrency(tax)}</span>
+                            </div>
+                            {order.discountAmount && Number(order.discountAmount) > 0 && (
+                                <div className="flex justify-between text-sm text-green-600">
+                                    <span className="text-muted-foreground">Discount</span>
+                                    <span>-{formatCurrency(Number(order.discountAmount))}</span>
                                 </div>
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
+                            <Separator />
+                            <div className="flex justify-between font-bold text-lg">
+                                <span>Total</span>
+                                <span>{formatCurrency(Number(order.total))}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
-                {/* Order Summary */}
+                {/* Order Items */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Summary</CardTitle>
+                        <CardTitle>Order Items</CardTitle>
+                        <CardDescription>{order.items.length} items in this order</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Items</span>
-                            <span>{order.items.length}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Subtotal</span>
-                            <span>{formatCurrency(Number(order.total))}</span>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between font-bold text-lg">
-                            <span>Total</span>
-                            <span>{formatCurrency(Number(order.total))}</span>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {order.items.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-0">
+                                    <div className="flex-1">
+                                        <p className="font-medium">{item.variant.product.name}</p>
+                                        <p className="text-sm text-muted-foreground">SKU: {item.variant.sku}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-medium">{formatCurrency(Number(item.price))}</p>
+                                        <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                                    </div>
+                                    <div className="ml-8 text-right min-w-[120px]">
+                                        <p className="font-bold">{formatCurrency(Number(item.price) * item.quantity)}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Order Items */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Order Items</CardTitle>
-                    <CardDescription>{order.items.length} items in this order</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {order.items.map((item) => (
-                            <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-0">
-                                <div className="flex-1">
-                                    <p className="font-medium">{item.variant.product.name}</p>
-                                    <p className="text-sm text-muted-foreground">SKU: {item.variant.sku}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="font-medium">{formatCurrency(Number(item.price))}</p>
-                                    <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                                </div>
-                                <div className="ml-8 text-right min-w-[120px]">
-                                    <p className="font-bold">{formatCurrency(Number(item.price) * item.quantity)}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Hidden Receipt Template */}
+            <ReceiptTemplate
+                ref={receiptRef}
+                storeName={tenant?.name || "Nexus POS Store"}
+                storeAddress={tenant?.address || "123 Tech Street, Jakarta"}
+                storePhone={tenant?.phone || "+62 812 3456 7890"}
+                headerText={tenant?.receiptHeader}
+                footerText={tenant?.receiptFooter}
+                showLogo={tenant?.showLogo !== false}
+                orderId={order.id}
+                date={new Date(order.createdAt)}
+                cashierName={order.cashierName || "Cashier"}
+                items={order.items.map(item => ({
+                    name: item.variant.product.name,
+                    quantity: item.quantity,
+                    price: Number(item.price),
+                    variantName: item.variant.sku
+                }))}
+                subtotal={subtotal}
+                tax={tax}
+                total={Number(order.total)}
+                discountAmount={Number(order.discountAmount || 0)}
+                discountName={order.discount?.name}
+            />
         </div>
     );
 }

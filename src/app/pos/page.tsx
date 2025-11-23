@@ -17,6 +17,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { useDebounce } from "@/hooks/use-debounce";
+import { CustomerSelector } from "@/components/pos/CustomerSelector";
 
 type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string };
 type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: number };
@@ -30,6 +31,12 @@ export default function POSPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [showPaymentSelector, setShowPaymentSelector] = useState(false);
     const [customerName, setCustomerName] = useState("");
+    const [discountCode, setDiscountCode] = useState("");
+    const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
+    const [validatingDiscount, setValidatingDiscount] = useState(false);
+    const [discountError, setDiscountError] = useState("");
+    const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; email?: string } | null>(null);
 
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -220,8 +227,47 @@ export default function POSPage() {
     };
 
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const tax = total * 0.11; // 11% VAT in Indonesia
-    const grandTotal = total + tax;
+    const taxRate = (tenant?.taxRate || 11) / 100; // Convert percentage to decimal
+    const tax = total * taxRate;
+    const grandTotal = total + tax - discountAmount;
+
+    const applyDiscount = async () => {
+        if (!discountCode.trim()) return;
+
+        setValidatingDiscount(true);
+        setDiscountError("");
+        try {
+            const res = await fetch('/api/discounts/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: discountCode, subtotal: total }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setAppliedDiscount(data.discount);
+                setDiscountAmount(data.discountAmount);
+                // alert(`Discount applied: ${data.discount.name}`); // Removed alert for better UX
+            } else {
+                const error = await res.json();
+                setDiscountError(error.error || 'Invalid discount code');
+                setAppliedDiscount(null);
+                setDiscountAmount(0);
+            }
+        } catch (error) {
+            console.error('Failed to validate discount', error);
+            setDiscountError('Failed to validate discount code');
+        } finally {
+            setValidatingDiscount(false);
+        }
+    };
+
+    const removeDiscount = () => {
+        setAppliedDiscount(null);
+        setDiscountAmount(0);
+        setDiscountCode("");
+        setDiscountError("");
+    };
 
     const holdCart = () => {
         if (cart.length === 0) return;
@@ -270,7 +316,9 @@ export default function POSPage() {
             })),
             subtotal: total,
             tax: tax,
-            total: grandTotal
+            total: grandTotal,
+            discountAmount: discountAmount,
+            discountName: appliedDiscount?.name
         });
 
         setTimeout(() => {
@@ -278,7 +326,13 @@ export default function POSPage() {
         }, 500);
 
         alert(isOffline ? 'Order saved offline! It will sync when online.' : `Order ${orderId} completed successfully!`);
+
+        // Reset cart and discount state
         setCart([]);
+        setDiscountCode("");
+        setAppliedDiscount(null);
+        setDiscountAmount(0);
+        setSelectedCustomer(null);
     };
 
     const handleCheckout = () => {
@@ -302,7 +356,9 @@ export default function POSPage() {
             paymentMethod,
             cashTendered,
             change: cashTendered ? cashTendered - grandTotal : undefined,
-            customerName: customerNameInput
+            customerId: selectedCustomer?.id, // Use selected customer ID
+            discountId: appliedDiscount?.id,
+            discountAmount: discountAmount
         };
 
         try {
@@ -327,7 +383,9 @@ export default function POSPage() {
                     paymentMethod,
                     cashTendered,
                     change: orderData.change,
-                    customerName: orderData.customerName
+                    customerId: orderData.customerId,
+                    discountId: orderData.discountId,
+                    discountAmount: orderData.discountAmount
                 });
                 processSuccessfulOrder(`OFF-${offlineId}`, "Offline Cashier", true);
             }
@@ -541,6 +599,12 @@ export default function POSPage() {
                         </ScrollArea>
 
                         <div className="p-4 bg-white border-t space-y-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+                            {/* Customer Selector */}
+                            <CustomerSelector
+                                selectedCustomer={selectedCustomer}
+                                onSelectCustomer={setSelectedCustomer}
+                            />
+
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">{t.pos.subtotal}</span>
@@ -550,6 +614,52 @@ export default function POSPage() {
                                     <span className="text-muted-foreground">{t.pos.tax} (11%)</span>
                                     <span className="font-medium">{formatCurrency(tax)}</span>
                                 </div>
+
+                                {/* Discount Section */}
+                                {!appliedDiscount ? (
+                                    <div className="flex flex-col gap-1 w-full">
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Discount code (optional)"
+                                                value={discountCode}
+                                                onChange={(e) => {
+                                                    setDiscountCode(e.target.value.toUpperCase());
+                                                    setDiscountError("");
+                                                }}
+                                                onKeyDown={(e) => e.key === 'Enter' && applyDiscount()}
+                                                className={cn("flex-1 text-xs", discountError && "border-red-500 focus-visible:ring-red-500")}
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={applyDiscount}
+                                                disabled={!discountCode.trim() || validatingDiscount}
+                                                className="text-xs"
+                                            >
+                                                {validatingDiscount ? "..." : "Apply"}
+                                            </Button>
+                                        </div>
+                                        {discountError && (
+                                            <span className="text-[10px] text-red-500 font-medium px-1">{discountError}</span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-between items-center text-sm bg-green-50 -mx-4 px-4 py-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-green-700 font-medium">Discount: {appliedDiscount.name}</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={removeDiscount}
+                                                className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                        <span className="font-medium text-green-700">-{formatCurrency(discountAmount)}</span>
+                                    </div>
+                                )}
+
                                 <div className="flex justify-between items-end pt-4 border-t border-dashed">
                                     <span className="text-lg font-medium">{t.pos.total}</span>
                                     <span className="text-3xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
@@ -580,6 +690,7 @@ export default function POSPage() {
                         onClose={() => setShowPaymentSelector(false)}
                         total={grandTotal}
                         onConfirm={processCheckout}
+                        selectedCustomer={selectedCustomer}
                     />
                 </div>
             </div>
@@ -588,9 +699,12 @@ export default function POSPage() {
             {lastOrder && (
                 <ReceiptTemplate
                     ref={receiptRef}
-                    storeName="Nexus POS Store"
-                    storeAddress="123 Tech Street, Jakarta"
-                    storePhone="+62 812 3456 7890"
+                    storeName={tenant?.name || "Nexus POS Store"}
+                    storeAddress={tenant?.address || "123 Tech Street, Jakarta"}
+                    storePhone={tenant?.phone || "+62 812 3456 7890"}
+                    headerText={tenant?.receiptHeader}
+                    footerText={tenant?.receiptFooter}
+                    showLogo={tenant?.showLogo !== false}
                     {...lastOrder}
                 />
             )}

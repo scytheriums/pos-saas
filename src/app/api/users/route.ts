@@ -1,41 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser, hasRole } from '@/lib/auth';
-import { clerkClient } from '@clerk/nextjs/server';
+import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { PermissionAction, PermissionResource } from '@prisma/client';
 
+// GET /api/users - List users with roles
 export async function GET(req: NextRequest) {
     try {
-        // Get authenticated user
         const authResult = await getAuthUser();
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-        const { tenantId, role } = authResult.user;
+        const { user, tenantId } = authResult;
 
-        // Only owners and managers can view team members
-        if (!hasRole(role, ['owner', 'manager'])) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        // Check permission
+        const canView = await hasPermission(user.id, PermissionAction.VIEW, PermissionResource.USERS);
+        if (!canView) {
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
         }
 
-        // Get all users for this tenant from Clerk
-        const client = await clerkClient();
-        const { data: allUsers } = await client.users.getUserList({
-            limit: 100,
+        const { searchParams } = new URL(req.url);
+        const roleId = searchParams.get('roleId');
+        const search = searchParams.get('search');
+
+        const where: any = { tenantId };
+        if (roleId) where.roleId = roleId;
+        if (search) {
+            where.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        const users = await prisma.user.findMany({
+            where,
+            include: {
+                role: {
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
         });
 
-        // Filter users by tenant
-        const tenantUsers = allUsers
-            .filter((user) => user.publicMetadata.tenantId === tenantId)
-            .map((user) => ({
-                id: user.id,
-                email: user.emailAddresses[0]?.emailAddress || '',
-                role: user.publicMetadata.role as string,
-                firstName: user.firstName,
-                lastName: user.lastName,
-            }));
-
-        return NextResponse.json({ users: tenantUsers });
+        return NextResponse.json({ users });
     } catch (error) {
-        console.error('Error fetching users:', error);
-        return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+        console.error('Failed to fetch users:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
