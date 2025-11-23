@@ -13,8 +13,10 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { VariantSelector } from "@/components/pos/VariantSelector";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatCurrencyWithSettings } from "@/lib/format";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTenantSettings } from "@/contexts/SettingsContext";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
@@ -24,6 +26,7 @@ type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: numbe
 
 export default function POSPage() {
     const { t, language, setLanguage } = useLanguage();
+    const settings = useTenantSettings();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
     const [variantModalOpen, setVariantModalOpen] = useState(false);
@@ -472,7 +475,7 @@ export default function POSPage() {
                                                     <PackageOpen className="w-12 h-12" />
                                                 </div>
                                                 <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold text-primary shadow-sm">
-                                                    {formatCurrency(product.price || product.variants?.[0]?.price || 0)}
+                                                    {formatCurrencyWithSettings(product.price || product.variants?.[0]?.price || 0, settings)}
                                                 </div>
                                             </div>
                                             <CardContent className="p-3">
@@ -525,7 +528,7 @@ export default function POSPage() {
                                                         <div key={held.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                                                             <div>
                                                                 <div className="font-medium">{new Date(held.timestamp).toLocaleTimeString()}</div>
-                                                                <div className="text-sm text-gray-500">{held.items.length} items • {formatCurrency(held.total)}</div>
+                                                                <div className="text-sm text-gray-500">{held.items.length} items • {formatCurrencyWithSettings(held.total, settings)}</div>
                                                             </div>
                                                             <div className="flex gap-2">
                                                                 <Button size="sm" variant="outline" onClick={() => restoreCart(held.id)}>
@@ -574,7 +577,7 @@ export default function POSPage() {
                                                     </button>
                                                 </div>
                                                 <div className="flex items-center justify-between mt-2">
-                                                    <div className="font-bold text-primary">{formatCurrency(item.price * item.quantity)}</div>
+                                                    <div className="font-bold text-primary">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</div>
                                                     <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1">
                                                         <button
                                                             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white hover:shadow-sm transition-all text-gray-600"
@@ -608,11 +611,11 @@ export default function POSPage() {
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">{t.pos.subtotal}</span>
-                                    <span className="font-medium">{formatCurrency(total)}</span>
+                                    <span className="font-medium">{formatCurrencyWithSettings(total, settings)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">{t.pos.tax} (11%)</span>
-                                    <span className="font-medium">{formatCurrency(tax)}</span>
+                                    <span className="font-medium">{formatCurrencyWithSettings(tax, settings)}</span>
                                 </div>
 
                                 {/* Discount Section */}
@@ -656,13 +659,13 @@ export default function POSPage() {
                                                 Remove
                                             </Button>
                                         </div>
-                                        <span className="font-medium text-green-700">-{formatCurrency(discountAmount)}</span>
+                                        <span className="font-medium text-green-700">-{formatCurrencyWithSettings(discountAmount, settings)}</span>
                                     </div>
                                 )}
 
                                 <div className="flex justify-between items-end pt-4 border-t border-dashed">
                                     <span className="text-lg font-medium">{t.pos.total}</span>
-                                    <span className="text-3xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
+                                    <span className="text-3xl font-bold text-primary">{formatCurrencyWithSettings(grandTotal, settings)}</span>
                                 </div>
                             </div>
                             <Button
