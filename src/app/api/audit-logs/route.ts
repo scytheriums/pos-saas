@@ -34,9 +34,9 @@ export async function GET(req: NextRequest) {
         if (action) where.action = action;
         if (resource) where.resource = resource;
         if (startDate || endDate) {
-            where.timestamp = {};
-            if (startDate) where.timestamp.gte = new Date(startDate);
-            if (endDate) where.timestamp.lte = new Date(endDate);
+            where.createdAt = {};
+            if (startDate) where.createdAt.gte = new Date(startDate);
+            if (endDate) where.createdAt.lte = new Date(endDate);
         }
 
         const [logs, total] = await Promise.all([
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
                     }
                 },
                 orderBy: {
-                    timestamp: 'desc'
+                    createdAt: 'desc'
                 },
                 take: limit,
                 skip: offset
@@ -60,7 +60,16 @@ export async function GET(req: NextRequest) {
             prisma.auditLog.count({ where })
         ]);
 
-        return NextResponse.json({ logs, total, limit, offset });
+        const page = Math.floor(offset / limit) + 1;
+        return NextResponse.json({
+            logs,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         console.error('Failed to fetch audit logs:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

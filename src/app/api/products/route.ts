@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getAuthUser } from "@/lib/auth";
+import { logCrudAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
     try {
@@ -185,6 +186,22 @@ export async function POST(req: NextRequest) {
             }
 
             return product;
+        });
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "CREATE",
+            resource: "PRODUCT",
+            resourceId: result.id,
+            after: {
+                name: result.name,
+                hasVariants: hasVariants,
+                categoryId: result.categoryId
+            },
+            request: req
         });
 
         return NextResponse.json(result, { status: 201 });

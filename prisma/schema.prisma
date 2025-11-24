@@ -352,18 +352,25 @@ model Permission {
 
 model AuditLog {
   id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
   userId     String
   user       User     @relation(fields: [userId], references: [id])
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  action     String   // e.g., "CREATE", "UPDATE", "DELETE"
-  resource   String   // e.g., "Product", "Order", "Customer"
+  userName   String   // Snapshot of user name at time of action
+  
+  action     String   // e.g., "CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT"
+  resource   String   // e.g., "PRODUCT", "ORDER", "USER", "CATEGORY", "SETTINGS"
   resourceId String?  // ID of the affected resource
-  details    Json?    // Additional context
+  
+  details    Json?    // Additional context (old values, new values, etc.)
   ipAddress  String?
-  timestamp  DateTime @default(now())
+  userAgent  String?
+  
+  createdAt  DateTime @default(now())
 
-  @@index([tenantId])
-  @@index([userId])
-  @@index([timestamp])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId])
+  @@index([tenantId, resource])
+  @@index([tenantId, action])
 }

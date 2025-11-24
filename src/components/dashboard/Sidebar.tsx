@@ -66,6 +66,7 @@ export function Sidebar() {
                 { label: t.sidebar.customers, href: "/dashboard/customers", icon: Users },
                 { label: t.sidebar.team, href: "/dashboard/users", icon: UserCog },
                 { label: "Roles & Permissions", href: "/dashboard/settings/roles", icon: Shield },
+                { label: "Audit Logs", href: "/dashboard/audit-logs", icon: FileText },
             ]
         },
     ];

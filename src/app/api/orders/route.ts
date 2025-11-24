@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getAuthUser } from "@/lib/auth";
+import { logCrudAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
     try {
@@ -228,7 +229,23 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            return { order, warnings: stockWarnings };
+            return { order, stockWarnings };
+        });
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "CREATE",
+            resource: "ORDER",
+            resourceId: result.order.id,
+            after: {
+                total: Number(result.order.total),
+                itemsCount: result.order.items.length,
+                paymentMethod: result.order.paymentMethod
+            },
+            request: req
         });
 
         return NextResponse.json(result, { status: 201 });
