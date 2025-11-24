@@ -1,5 +1,4 @@
-'use client';
-
+"use client";
 import { useEffect, useState } from 'react';
 import { MetricCard } from '@/components/analytics/MetricCard';
 import { SalesChart } from '@/components/analytics/SalesChart';
@@ -8,6 +7,7 @@ import { DollarSign, ShoppingCart, TrendingUp } from 'lucide-react';
 import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
 import { useTenantSettings } from '@/contexts/SettingsContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardTour } from '@/components/dashboard/DashboardTour';
 
 interface DailyIncomeData {
     totalOrders: number;
@@ -50,19 +50,16 @@ export default function AnalyticsPage() {
                 const [incomeRes, trendsRes, stockRes] = await Promise.all([
                     fetch('/api/analytics/daily-income'),
                     fetch('/api/analytics/sales-trends?period=week'),
-                    fetch('/api/analytics/low-stock')
+                    fetch('/api/analytics/low-stock'),
                 ]);
-
                 if (!incomeRes.ok || !trendsRes.ok || !stockRes.ok) {
                     throw new Error('Failed to fetch analytics data');
                 }
-
                 const [income, trends, stock] = await Promise.all([
                     incomeRes.json(),
                     trendsRes.json(),
-                    stockRes.json()
+                    stockRes.json(),
                 ]);
-
                 setDailyIncome(income);
                 setSalesTrends(trends);
                 setLowStock(stock);
@@ -73,7 +70,6 @@ export default function AnalyticsPage() {
                 setLoading(false);
             }
         }
-
         fetchAnalytics();
     }, []);
 
@@ -111,9 +107,10 @@ export default function AnalyticsPage() {
                     Last updated: {formatDateTimeWithSettings(new Date(), settings)}
                 </p>
             </div>
+            {/* <DashboardTour /> */}
 
             {/* Metric Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div id="metric-cards" className="grid gap-4 md:grid-cols-3">
                 <MetricCard
                     title="Total Revenue (Today)"
                     value={formatCurrencyWithSettings(dailyIncome?.totalRevenue || 0, settings)}
@@ -133,18 +130,16 @@ export default function AnalyticsPage() {
 
             {/* Sales Trends Chart */}
             {salesTrends && (
-                <SalesChart
-                    data={salesTrends.data}
-                    title="Sales Trends (Last 7 Days)"
-                />
+                <div id="sales-chart">
+                    <SalesChart data={salesTrends.data} title="Sales Trends (Last 7 Days)" />
+                </div>
             )}
 
             {/* Low Stock Alerts */}
             {lowStock && (
-                <LowStockTable
-                    items={lowStock.items}
-                    threshold={lowStock.threshold}
-                />
+                <div id="low-stock">
+                    <LowStockTable items={lowStock.items} threshold={lowStock.threshold} />
+                </div>
             )}
         </div>
     );
