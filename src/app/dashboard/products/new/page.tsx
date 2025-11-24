@@ -18,6 +18,7 @@ interface VariantData {
     optionValueIds: string[];
     sku: string;
     price: number;
+    cost: number;
     stock: number;
 }
 
@@ -73,6 +74,7 @@ export default function NewProductPage() {
     // Simple product (no variants)
     const [simpleSku, setSimpleSku] = useState('');
     const [simplePrice, setSimplePrice] = useState(0);
+    const [simpleCost, setSimpleCost] = useState(0);
     const [simpleStock, setSimpleStock] = useState(0);
 
     // Variant product
@@ -100,6 +102,7 @@ export default function NewProductPage() {
                         optionValueIds: v.optionValueIds,
                         sku: v.sku,
                         price: v.price,
+                        cost: v.cost,
                         stock: v.stock
                     }))
                 } : {
@@ -107,6 +110,7 @@ export default function NewProductPage() {
                     variants: [{
                         sku: simpleSku,
                         price: simplePrice,
+                        cost: simpleCost,
                         stock: simpleStock
                     }]
                 })
@@ -235,7 +239,7 @@ export default function NewProductPage() {
                             <CardTitle>Product Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="sku">SKU *</Label>
                                     <Input
@@ -243,18 +247,6 @@ export default function NewProductPage() {
                                         value={simpleSku}
                                         onChange={(e) => setSimpleSku(e.target.value)}
                                         placeholder="PROD-001"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="price">Price (Rp) *</Label>
-                                    <Input
-                                        id="price"
-                                        type="number"
-                                        value={simplePrice}
-                                        onChange={(e) => setSimplePrice(parseFloat(e.target.value))}
-                                        min={0}
-                                        step={0.01}
                                         required
                                     />
                                 </div>
@@ -268,6 +260,33 @@ export default function NewProductPage() {
                                         min={0}
                                         required
                                     />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="price">Price (Rp) *</Label>
+                                    <Input
+                                        id="price"
+                                        type="number"
+                                        value={simplePrice}
+                                        onChange={(e) => setSimplePrice(parseFloat(e.target.value))}
+                                        min={0}
+                                        step={0.01}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cost">Cost (Rp)</Label>
+                                    <Input
+                                        id="cost"
+                                        type="number"
+                                        value={simpleCost}
+                                        onChange={(e) => setSimpleCost(parseFloat(e.target.value))}
+                                        min={0}
+                                        step={0.01}
+                                        placeholder="0"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Used to calculate profit margins</p>
                                 </div>
                             </div>
                         </CardContent>

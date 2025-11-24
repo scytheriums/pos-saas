@@ -125,9 +125,10 @@ export async function POST(req: NextRequest) {
         }
 
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Validate Stock Availability
+            // 1. Validate Stock Availability and fetch variant data
             const stockWarnings: string[] = [];
             const stockErrors: string[] = [];
+            const variantDataMap = new Map<string, { price: number; cost: number }>();
 
             for (const item of items) {
                 const variantId = item.variantId || item.id;
@@ -137,6 +138,8 @@ export async function POST(req: NextRequest) {
                         id: true,
                         stock: true,
                         sku: true,
+                        price: true,
+                        cost: true,
                         product: {
                             select: {
                                 name: true,
@@ -167,6 +170,12 @@ export async function POST(req: NextRequest) {
                         `New stock: ${newStock}, Minimum: ${variant.product.minStock}`
                     );
                 }
+
+                // Store variant data for order creation
+                variantDataMap.set(variantId, {
+                    price: Number(variant.price),
+                    cost: Number(variant.cost)
+                });
             }
 
             // If there are stock errors, abort transaction
@@ -189,11 +198,16 @@ export async function POST(req: NextRequest) {
                     discountId: discountId || null,
                     discountAmount: discountAmount ? new Prisma.Decimal(discountAmount) : new Prisma.Decimal(0),
                     items: {
-                        create: items.map((item: any) => ({
-                            variantId: item.variantId || item.id,
-                            quantity: item.quantity,
-                            price: new Prisma.Decimal(item.price)
-                        }))
+                        create: items.map((item: any) => {
+                            const variantId = item.variantId || item.id;
+                            const variantData = variantDataMap.get(variantId);
+                            return {
+                                variantId,
+                                quantity: item.quantity,
+                                price: new Prisma.Decimal(variantData?.price || item.price),
+                                cost: new Prisma.Decimal(variantData?.cost || 0)
+                            };
+                        })
                     }
                 },
                 include: {

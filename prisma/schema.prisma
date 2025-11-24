@@ -196,6 +196,7 @@ model ProductVariant {
   sku       String  @unique
   barcode   String? @unique // Specific barcode for this variant
   price     Decimal
+  cost      Decimal @default(0) // Cost price for profit calculation
   stock     Int     @default(0) // Stock in Base Unit
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -261,6 +262,7 @@ model OrderItem {
   variant   ProductVariant @relation(fields: [variantId], references: [id])
   quantity  Int
   price     Decimal // Snapshot of price at time of sale
+  cost      Decimal @default(0) // Snapshot of cost at time of sale
 }
 
 model StockAdjustment {

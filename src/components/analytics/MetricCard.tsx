@@ -5,14 +5,19 @@ interface MetricCardProps {
     title: string;
     value: string | number;
     icon: LucideIcon;
+    description?: string;
     trend?: {
         value: number;
-        isPositive: boolean;
+        label?: string;
+        positive?: boolean;
+        isPositive?: boolean; // Support both for backward compatibility
     };
     className?: string;
 }
 
-export function MetricCard({ title, value, icon: Icon, trend, className }: MetricCardProps) {
+export function MetricCard({ title, value, icon: Icon, description, trend, className }: MetricCardProps) {
+    const isPositive = trend?.positive ?? trend?.isPositive;
+
     return (
         <Card className={className}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -21,9 +26,14 @@ export function MetricCard({ title, value, icon: Icon, trend, className }: Metri
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{value}</div>
+                {description && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                        {description}
+                    </p>
+                )}
                 {trend && (
-                    <p className={`text-xs ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                        {trend.isPositive ? '+' : ''}{trend.value}% from last period
+                    <p className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'} mt-1`}>
+                        {isPositive ? '+' : ''}{trend.value.toFixed(1)}% {trend.label || 'from last period'}
                     </p>
                 )}
             </CardContent>

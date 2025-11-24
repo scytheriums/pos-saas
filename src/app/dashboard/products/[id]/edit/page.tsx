@@ -22,11 +22,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CostHistoryTab from "@/components/products/CostHistoryTab";
 
 interface Variant {
     id: string;
     sku: string;
     price: number;
+    cost: number;
     stock: number;
 }
 
@@ -35,6 +38,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
     const [editing, setEditing] = useState(false);
     const [sku, setSku] = useState(variant.sku);
     const [price, setPrice] = useState(variant.price);
+    const [cost, setCost] = useState(variant.cost);
     const [stock, setStock] = useState(variant.stock);
     const [saving, setSaving] = useState(false);
 
@@ -44,7 +48,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
             const response = await fetch(`/api/products/${productId}/variants/${variant.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku, price, stock })
+                body: JSON.stringify({ sku, price, cost, stock })
             });
 
             if (!response.ok) {
@@ -64,6 +68,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
     const handleCancel = () => {
         setSku(variant.sku);
         setPrice(variant.price);
+        setCost(variant.cost);
         setStock(variant.stock);
         setEditing(false);
     };
@@ -82,7 +87,14 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
                     value={price}
                     onChange={(e) => setPrice(parseFloat(e.target.value))}
                     placeholder="Price"
-                    className="w-32"
+                    className="w-28"
+                />
+                <Input
+                    type="number"
+                    value={cost}
+                    onChange={(e) => setCost(parseFloat(e.target.value))}
+                    placeholder="Cost"
+                    className="w-28"
                 />
                 <Input
                     type="number"
@@ -106,7 +118,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
             <div className="flex-1">
                 <p className="font-medium">{variant.sku}</p>
                 <p className="text-sm text-muted-foreground">
-                    Stock: {variant.stock} units
+                    Stock: {variant.stock} units | Cost: Rp {variant.cost.toLocaleString()}
                 </p>
             </div>
             <div className="flex items-center gap-3">
@@ -128,6 +140,7 @@ interface Product {
         id: string;
         sku: string;
         price: number;
+        cost: number;
         stock: number;
     }>;
 }
@@ -317,104 +330,117 @@ export default function EditProductPage() {
                 </AlertDialog>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Basic Information */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Basic Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Product Name *</Label>
-                            <Input
-                                id="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                rows={3}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="category">Category (Optional)</Label>
-                            <Select value={categoryId} onValueChange={setCategoryId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__none__">No Category</SelectItem>
-                                    {categories.map(cat => (
-                                        <SelectItem key={cat.id} value={cat.id}>
-                                            {'  '.repeat(cat.level)}└─ {cat.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="minStock">Minimum Stock Threshold</Label>
-                            <Input
-                                id="minStock"
-                                type="number"
-                                value={minStock}
-                                onChange={(e) => setMinStock(parseInt(e.target.value))}
-                                min={0}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                You'll be alerted when stock falls below this level
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+            <Tabs defaultValue="details" className="space-y-6">
+                <TabsList>
+                    <TabsTrigger value="details">Product Details</TabsTrigger>
+                    <TabsTrigger value="cost-history">Cost History</TabsTrigger>
+                </TabsList>
 
-                {/* Variants Information (Editable) */}
-                {product && product.variants.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Variants ({product.variants.length})</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-3">
-                                {product.variants.map((variant, index) => (
-                                    <VariantEditRow
-                                        key={variant.id}
-                                        variant={variant}
-                                        productId={productId}
-                                        onUpdate={fetchProduct}
+                <TabsContent value="details" className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Basic Information */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Basic Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Product Name *</Label>
+                                    <Input
+                                        id="name"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
                                     />
-                                ))}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea
+                                        id="description"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="category">Category (Optional)</Label>
+                                    <Select value={categoryId} onValueChange={setCategoryId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">No Category</SelectItem>
+                                            {categories.map(cat => (
+                                                <SelectItem key={cat.id} value={cat.id}>
+                                                    {'  '.repeat(cat.level)}└─ {cat.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="minStock">Minimum Stock Threshold</Label>
+                                    <Input
+                                        id="minStock"
+                                        type="number"
+                                        value={minStock}
+                                        onChange={(e) => setMinStock(parseInt(e.target.value))}
+                                        min={0}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        You'll be alerted when stock falls below this level
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Variants Information (Editable) */}
+                        {product && product.variants.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Variants ({product.variants.length})</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {product.variants.map((variant, index) => (
+                                            <VariantEditRow
+                                                key={variant.id}
+                                                variant={variant}
+                                                productId={productId}
+                                                onUpdate={fetchProduct}
+                                            />
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Error Message */}
+                        {error && (
+                            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
+                                {error}
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                        )}
 
-                {/* Error Message */}
-                {error && (
-                    <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
-                        {error}
-                    </div>
-                )}
+                        {/* Actions */}
+                        <div className="flex justify-end gap-4">
+                            <Link href="/dashboard/products">
+                                <Button type="button" variant="outline" disabled={saving}>
+                                    Cancel
+                                </Button>
+                            </Link>
+                            <Button type="submit" disabled={saving}>
+                                <Save className="mr-2 h-4 w-4" />
+                                {saving ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                        </div>
+                    </form>
+                </TabsContent>
 
-                {/* Actions */}
-                <div className="flex justify-end gap-4">
-                    <Link href="/dashboard/products">
-                        <Button type="button" variant="outline" disabled={saving}>
-                            Cancel
-                        </Button>
-                    </Link>
-                    <Button type="submit" disabled={saving}>
-                        <Save className="mr-2 h-4 w-4" />
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                </div>
-            </form>
+                <TabsContent value="cost-history">
+                    <CostHistoryTab productId={productId} />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

@@ -25,6 +25,7 @@ interface Variant {
     optionValueIds: string[];
     sku: string;
     price: number;
+    cost: number;
     stock: number;
 }
 
@@ -84,6 +85,7 @@ export function VariantMatrixEditor({
             optionValueIds,
             sku: '',
             price: 0,
+            cost: 0,
             stock: 0
         }));
     };
@@ -137,7 +139,7 @@ export function VariantMatrixEditor({
         onOptionsChange(updatedOptions);
     };
 
-    const updateVariant = (variantId: string, field: 'sku' | 'price' | 'stock', value: string | number) => {
+    const updateVariant = (variantId: string, field: 'sku' | 'price' | 'cost' | 'stock', value: string | number) => {
         const updatedVariants = variants.map(v => {
             if (v.id === variantId) {
                 return { ...v, [field]: value };
@@ -166,6 +168,17 @@ export function VariantMatrixEditor({
         if (isNaN(priceNum)) return;
 
         const updatedVariants = variants.map(v => ({ ...v, price: priceNum }));
+        onVariantsChange(updatedVariants);
+    };
+
+    const bulkSetCost = () => {
+        const cost = prompt('Enter cost for all variants:');
+        if (cost === null) return;
+
+        const costNum = parseFloat(cost);
+        if (isNaN(costNum)) return;
+
+        const updatedVariants = variants.map(v => ({ ...v, cost: costNum }));
         onVariantsChange(updatedVariants);
     };
 
@@ -281,6 +294,9 @@ export function VariantMatrixEditor({
                                 <Button type="button" variant="outline" size="sm" onClick={bulkSetPrice}>
                                     Bulk Set Price
                                 </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={bulkSetCost}>
+                                    Bulk Set Cost
+                                </Button>
                                 <Button type="button" variant="outline" size="sm" onClick={bulkSetStock}>
                                     Bulk Set Stock
                                 </Button>
@@ -308,6 +324,7 @@ export function VariantMatrixEditor({
                                         <TableHead>Variant</TableHead>
                                         <TableHead>SKU *</TableHead>
                                         <TableHead>Price (Rp) *</TableHead>
+                                        <TableHead>Cost (Rp)</TableHead>
                                         <TableHead>Stock *</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -333,6 +350,15 @@ export function VariantMatrixEditor({
                                                     min={0}
                                                     step={0.01}
                                                     required
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Input
+                                                    type="number"
+                                                    value={variant.cost}
+                                                    onChange={(e) => updateVariant(variant.id, 'cost', parseFloat(e.target.value))}
+                                                    min={0}
+                                                    step={0.01}
                                                 />
                                             </TableCell>
                                             <TableCell>

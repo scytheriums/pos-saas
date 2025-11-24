@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
                         productId: product.id,
                         sku: sku,
                         price: new Prisma.Decimal(simpleVariant.price),
+                        cost: new Prisma.Decimal(simpleVariant.cost || 0),
                         stock: simpleVariant.stock,
                     },
                 });
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
                                 productId: product.id,
                                 sku: sku,
                                 price: new Prisma.Decimal(variant.price),
+                                cost: new Prisma.Decimal(variant.cost || 0),
                                 stock: variant.stock,
                                 optionValues: {
                                     connect: optionValueIds.map(id => ({ id }))
