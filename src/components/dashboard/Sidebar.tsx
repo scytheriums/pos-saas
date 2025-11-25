@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useState, useEffect } from "react";
+import { useClerk } from "@clerk/nextjs";
 
 type MenuItem = {
     icon: any;
@@ -37,6 +38,7 @@ type MenuItem = {
 export function Sidebar() {
     const pathname = usePathname();
     const { t } = useLanguage();
+    const { signOut } = useClerk();
     const [selectedModule, setSelectedModule] = useState<string | null>(null);
     const [isSecondaryCollapsed, setIsSecondaryCollapsed] = useState(false);
 
@@ -57,8 +59,8 @@ export function Sidebar() {
             label: t.sidebar.orders,
             children: [
                 { label: "All Orders", href: "/dashboard/orders", icon: Store },
-                { label: "Returns", href: "/dashboard/returns", icon: RotateCcw },
-            ]
+                { label: "Return", href: "/dashboard/returns", icon: RotateCcw },
+            ],
         },
         { icon: Percent, label: "Promotions", href: "/dashboard/promotions" },
         {
@@ -72,7 +74,7 @@ export function Sidebar() {
                 { label: t.sidebar.customers, href: "/dashboard/customers", icon: Users },
                 { label: t.sidebar.team, href: "/dashboard/users", icon: UserCog },
                 { label: "Roles & Permissions", href: "/dashboard/settings/roles", icon: Shield },
-                { label: "Audit Logs", href: "/dashboard/audit-logs", icon: FileText },
+                { label: "Audit Log", href: "/dashboard/audit-logs", icon: BarChart3 },
             ],
         },
     ];
@@ -97,7 +99,7 @@ export function Sidebar() {
 
     return (
         <div className="flex h-full">
-            {/* Icon Sidebar */}
+            {/* Primary Icon Sidebar */}
             <div className="w-16 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-2">
                 <div className="h-10 w-10 rounded-md bg-primary flex items-center justify-center mb-4">
                     <Store className="h-6 w-6 text-primary-foreground" />
@@ -130,11 +132,11 @@ export function Sidebar() {
                         </div>
                     );
                 })}
-                {/* Logout Button */}
+                {/* Logout */}
                 <div className="relative group mt-auto">
                     <button
                         onClick={() => {
-                            window.location.href = "/api/auth/signout";
+                            signOut({ redirectUrl: '/sign-in' });
                         }}
                         className="w-10 h-10 rounded-md flex items-center justify-center transition-colors text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                     >
@@ -146,7 +148,7 @@ export function Sidebar() {
                 </div>
             </div>
 
-            {/* Submenu Sidebar – slides in/out smoothly */}
+            {/* Secondary Submenu Sidebar */}
             {hasChildren && (
                 <div
                     className={cn(
@@ -154,8 +156,8 @@ export function Sidebar() {
                         isSecondaryCollapsed ? "w-0 opacity-0" : "w-56 opacity-100"
                     )}
                 >
-                    <div className="min-w-56">
-                        {/* Header with collapse button */}
+                    <div className={cn("min-w-56", "transition-all duration-300 ease-in-out delay-150", isSecondaryCollapsed ? "opacity-0 -translate-x-2" : "opacity-100 translate-x-0")}>
+                        {/* Header */}
                         <div className="h-16 px-4 border-b border-sidebar-border flex items-center justify-between">
                             <h1 className="text-base font-semibold text-sidebar-foreground">
                                 {selectedMenuItem?.label}
