@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
+import { logCrudAudit } from '@/lib/audit';
 
 // Helper function to check for circular reference
 async function wouldCreateCircularReference(categoryId: string, newParentId: string, tenantId: string): Promise<boolean> {
@@ -86,6 +87,25 @@ export async function PUT(
             }
         });
 
+        // Log audit trail
+        await logCrudAudit({
+            tenantId: user.tenantId,
+            userId: user.id,
+            userName: user.name,
+            action: "UPDATE",
+            resource: "CATEGORY",
+            resourceId: id,
+            before: {
+                name: category.name,
+                parentId: category.parentId
+            },
+            after: {
+                name: updated.name,
+                parentId: updated.parentId
+            },
+            request
+        });
+
         return NextResponse.json(updated);
     } catch (error: any) {
         console.error('Error updating category:', error);
@@ -143,6 +163,21 @@ export async function DELETE(
         // Delete category
         await prisma.category.delete({
             where: { id }
+        });
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId: user.tenantId,
+            userId: user.id,
+            userName: user.name,
+            action: "DELETE",
+            resource: "CATEGORY",
+            resourceId: id,
+            before: {
+                name: category.name,
+                parentId: category.parentId
+            },
+            request
         });
 
         return NextResponse.json({ message: 'Category deleted successfully' });

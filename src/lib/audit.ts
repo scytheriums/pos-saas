@@ -17,10 +17,12 @@ export type AuditAction =
     | "CREATE"
     | "UPDATE"
     | "DELETE"
+    | "VIEW"
     | "LOGIN"
     | "LOGOUT"
     | "EXPORT"
     | "SETTINGS_CHANGE"
+    | "STOCK_ADJUSTMENT"
     | "PERMISSION_CHANGE";
 
 // Audit Resources
@@ -33,6 +35,7 @@ export type AuditResource =
     | "DISCOUNT"
     | "SETTINGS"
     | "ROLE"
+    | "RETURN"
     | "STOCK_ADJUSTMENT";
 
 /**

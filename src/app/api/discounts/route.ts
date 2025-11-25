@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import { logCrudAudit } from "@/lib/audit";
 
 // GET /api/discounts - List discounts
 export async function GET(req: NextRequest) {
@@ -85,6 +86,24 @@ export async function POST(req: NextRequest) {
                 active: active ?? true,
                 tenantId,
             },
+        });
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "CREATE",
+            resource: "DISCOUNT",
+            resourceId: discount.id,
+            after: {
+                name: discount.name,
+                code: discount.code,
+                type: discount.type,
+                value: Number(discount.value),
+                active: discount.active
+            },
+            request: req
         });
 
         return NextResponse.json({ discount }, { status: 201 });

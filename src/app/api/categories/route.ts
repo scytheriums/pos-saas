@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
+import { logCrudAudit } from '@/lib/audit';
 
 // Helper function to build category tree
 function buildCategoryTree(categories: any[], parentId: string | null = null): any[] {
@@ -108,6 +109,22 @@ export async function POST(request: NextRequest) {
         });
 
         const path = getFullPath(allCategories, category.id);
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId: user.tenantId,
+            userId: user.id,
+            userName: user.name,
+            action: "CREATE",
+            resource: "CATEGORY",
+            resourceId: category.id,
+            after: {
+                name: category.name,
+                parentId: category.parentId,
+                path: path
+            },
+            request
+        });
 
         return NextResponse.json({ ...category, path }, { status: 201 });
     } catch (error: any) {

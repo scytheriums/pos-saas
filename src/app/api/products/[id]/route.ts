@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
+import { logCrudAudit } from '@/lib/audit';
 
 export async function GET(
     req: NextRequest,
@@ -90,6 +91,29 @@ export async function PATCH(
             }
         });
 
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "UPDATE",
+            resource: "PRODUCT",
+            resourceId: id,
+            before: {
+                name: existingProduct.name,
+                description: existingProduct.description,
+                minStock: existingProduct.minStock,
+                categoryId: existingProduct.categoryId
+            },
+            after: {
+                name: updatedProduct.name,
+                description: updatedProduct.description,
+                minStock: updatedProduct.minStock,
+                categoryId: updatedProduct.categoryId
+            },
+            request: req
+        });
+
         return NextResponse.json(updatedProduct);
     } catch (error) {
         console.error('Error updating product:', error);
@@ -147,6 +171,21 @@ export async function DELETE(
         if (deleteResult.count === 0) {
             return NextResponse.json({ error: 'Product not found or access denied' }, { status: 404 });
         }
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "DELETE",
+            resource: "PRODUCT",
+            resourceId: id,
+            before: {
+                name: product.name,
+                variantsCount: product.variants.length
+            },
+            request: req
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

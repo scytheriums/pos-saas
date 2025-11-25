@@ -21,7 +21,8 @@ import {
     ClipboardList,
     Percent,
     Globe,
-    Shield
+    Shield,
+    RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -53,7 +54,14 @@ export function Sidebar() {
                 { label: "Adjustments", href: "/dashboard/inventory/adjustments", icon: ClipboardList },
             ]
         },
-        { icon: Store, label: t.sidebar.orders, href: "/dashboard/orders" },
+        {
+            icon: Store,
+            label: t.sidebar.orders,
+            children: [
+                { label: "All Orders", href: "/dashboard/orders", icon: Store },
+                { label: "Returns", href: "/dashboard/returns", icon: RotateCcw },
+            ]
+        },
         { icon: Percent, label: "Promotions", href: "/dashboard/promotions" },
         {
             icon: Settings,

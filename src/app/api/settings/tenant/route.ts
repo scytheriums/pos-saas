@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
     try {
@@ -102,6 +103,19 @@ export async function PATCH(req: NextRequest) {
                 dateFormat,
                 timeFormat,
             }
+        });
+
+        // Log audit trail
+        await logAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "SETTINGS_CHANGE",
+            resource: "SETTINGS",
+            details: {
+                updatedFields: Object.keys(body)
+            },
+            request: req
         });
 
         return NextResponse.json(updatedTenant);

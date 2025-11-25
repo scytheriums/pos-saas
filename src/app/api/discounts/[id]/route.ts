@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import { logCrudAudit } from "@/lib/audit";
 
 // GET /api/discounts/[id]
 export async function GET(
@@ -84,6 +85,21 @@ export async function PATCH(
             where: { id: params.id },
         });
 
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "UPDATE",
+            resource: "DISCOUNT",
+            resourceId: params.id,
+            after: {
+                name: updatedDiscount?.name,
+                active: updatedDiscount?.active
+            },
+            request: req
+        });
+
         return NextResponse.json({ discount: updatedDiscount });
     } catch (error: any) {
         console.error("Failed to update discount:", error);
@@ -117,6 +133,17 @@ export async function DELETE(
         if (discount.count === 0) {
             return NextResponse.json({ error: "Discount not found" }, { status: 404 });
         }
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "DELETE",
+            resource: "DISCOUNT",
+            resourceId: params.id,
+            request: req
+        });
 
         return NextResponse.json({ message: "Discount deleted successfully" });
     } catch (error) {

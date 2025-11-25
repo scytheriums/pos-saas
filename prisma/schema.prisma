@@ -92,6 +92,7 @@ model Tenant {
   customers        Customer[]
   discounts        Discount[]
   auditLogs        AuditLog[]
+  returns          Return[]
 }
 
 model User {
@@ -206,6 +207,7 @@ model ProductVariant {
 
   orderItems       OrderItem[]
   stockAdjustments StockAdjustment[]
+  returnItems      ReturnItem[]
 
   @@index([sku])
 }
@@ -251,6 +253,7 @@ model Order {
   discountId     String?
   discount       Discount?      @relation(fields: [discountId], references: [id])
   discountAmount Decimal?
+  returns        Return[]
   createdAt      DateTime       @default(now())
 }
 
@@ -288,6 +291,7 @@ model Customer {
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   orders    Order[]
+  returns   Return[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -373,4 +377,78 @@ model AuditLog {
   @@index([tenantId, userId])
   @@index([tenantId, resource])
   @@index([tenantId, action])
+}
+
+// Returns & Refunds Enums
+enum ReturnReason {
+  DEFECTIVE
+  WRONG_ITEM
+  NOT_AS_DESCRIBED
+  CHANGED_MIND
+  DUPLICATE_ORDER
+  OTHER
+}
+
+enum RefundMethod {
+  CASH
+  STORE_CREDIT
+  ORIGINAL_PAYMENT
+}
+
+enum ReturnStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model Return {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id])
+  
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  
+  reason          ReturnReason
+  reasonNote      String?
+  
+  refundMethod    RefundMethod
+  refundAmount    Decimal       @db.Decimal(10, 2)
+  
+  status          ReturnStatus  @default(PENDING)
+  
+  processedBy     String
+  processedByName String
+  
+  items           ReturnItem[]
+  
+  createdAt       DateTime      @default(now())
+  processedAt     DateTime?
+  
+  @@index([tenantId, createdAt])
+  @@index([tenantId, orderId])
+  @@index([tenantId, status])
+}
+
+model ReturnItem {
+  id              String          @id @default(cuid())
+  returnId        String
+  return          Return          @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  
+  orderItemId     String
+  variantId       String
+  variant         ProductVariant  @relation(fields: [variantId], references: [id])
+  
+  quantity        Int
+  price           Decimal         @db.Decimal(10, 2)
+  refundAmount    Decimal         @db.Decimal(10, 2)
+  
+  restocked       Boolean         @default(false)
+  
+  @@index([returnId])
+  @@index([variantId])
 }
