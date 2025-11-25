@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CostHistoryTab from "@/components/products/CostHistoryTab";
+import { ImageUpload } from '@/components/ui/image-upload';
 
 interface Variant {
     id: string;
@@ -31,6 +32,7 @@ interface Variant {
     price: number;
     cost: number;
     stock: number;
+    imageUrl?: string | null;
 }
 
 // Variant Edit Row Component
@@ -40,6 +42,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
     const [price, setPrice] = useState(variant.price);
     const [cost, setCost] = useState(variant.cost);
     const [stock, setStock] = useState(variant.stock);
+    const [imageUrl, setImageUrl] = useState(variant.imageUrl);
     const [saving, setSaving] = useState(false);
 
     const handleSave = async () => {
@@ -48,7 +51,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
             const response = await fetch(`/api/products/${productId}/variants/${variant.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku, price, cost, stock })
+                body: JSON.stringify({ sku, price, cost, stock, imageUrl })
             });
 
             if (!response.ok) {
@@ -70,6 +73,7 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
         setPrice(variant.price);
         setCost(variant.cost);
         setStock(variant.stock);
+        setImageUrl(variant.imageUrl);
         setEditing(false);
     };
 
@@ -103,6 +107,15 @@ function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; pr
                     placeholder="Stock"
                     className="w-24"
                 />
+                <div className="w-10 h-10 shrink-0">
+                    <ImageUpload
+                        value={imageUrl || undefined}
+                        onChange={(url) => setImageUrl(url)}
+                        type="product"
+                        disabled={saving}
+                        minimal
+                    />
+                </div>
                 <Button size="sm" onClick={handleSave} disabled={saving}>
                     <Check className="h-4 w-4" />
                 </Button>
@@ -135,6 +148,7 @@ interface Product {
     id: string;
     name: string;
     description: string | null;
+    imageUrl: string | null;
     minStock: number;
     variants: Array<{
         id: string;
@@ -156,9 +170,9 @@ export default function EditProductPage() {
     const [error, setError] = useState<string | null>(null);
     const [product, setProduct] = useState<Product | null>(null);
 
-    // Form fields
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [minStock, setMinStock] = useState(10);
     const [categoryId, setCategoryId] = useState<string>('');
 
@@ -204,6 +218,7 @@ export default function EditProductPage() {
             setProduct(data);
             setName(data.name);
             setDescription(data.description || '');
+            setImageUrl(data.imageUrl || null);
             setMinStock(data.minStock);
             setCategoryId(data.categoryId || '__none__');
         } catch (err: any) {
@@ -225,6 +240,7 @@ export default function EditProductPage() {
                 body: JSON.stringify({
                     name,
                     description,
+                    imageUrl,
                     minStock,
                     categoryId: categoryId === '__none__' ? null : categoryId
                 })
@@ -360,6 +376,15 @@ export default function EditProductPage() {
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Product Image</Label>
+                                    <ImageUpload
+                                        value={imageUrl || undefined}
+                                        onChange={(url) => setImageUrl(url)}
+                                        type="product"
+                                        disabled={saving}
                                     />
                                 </div>
                                 <div className="space-y-2">

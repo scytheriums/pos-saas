@@ -145,6 +145,7 @@ model Product {
   id          String  @id @default(cuid())
   name        String
   description String?
+  imageUrl    String? // Main product image
   minStock    Int     @default(10)
   categoryId  String?
   tenantId    String
@@ -198,6 +199,7 @@ model ProductVariant {
   barcode   String? @unique // Specific barcode for this variant
   price     Decimal
   cost      Decimal @default(0) // Cost price for profit calculation
+  imageUrl  String? // Variant-specific image (optional)
   stock     Int     @default(0) // Stock in Base Unit
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)

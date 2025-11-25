@@ -25,11 +25,12 @@ interface ReceiptProps {
     headerText?: string;
     footerText?: string;
     showLogo?: boolean;
+    logoUrl?: string;
     isPreview?: boolean;
 }
 
 export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
-    ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, headerText, footerText, showLogo, isPreview }, ref) => {
+    ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, headerText, footerText, showLogo, logoUrl, isPreview }, ref) => {
         const settings = useTenantSettings();
         return (
             <div ref={ref} className={isPreview ? "w-full p-4 font-mono text-xs leading-tight text-black bg-white" : "hidden print:block print:w-full print:p-1 print:font-mono print:text-[10px] print:leading-tight text-black bg-white"}>
@@ -41,12 +42,13 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                 </style>
                 {/* Header */}
                 <div className="text-center mb-4 border-b border-black pb-2 border-dashed">
-                    {showLogo && (
+                    {showLogo && logoUrl && (
                         <div className="mb-2 flex justify-center">
-                            {/* Placeholder for Logo - in real app would be an img tag */}
-                            <div className="h-8 w-8 bg-black rounded-full flex items-center justify-center text-white text-[8px] font-bold">
-                                LOGO
-                            </div>
+                            <img
+                                src={logoUrl}
+                                alt="Business Logo"
+                                className="h-12 w-auto max-w-[120px] object-contain"
+                            />
                         </div>
                     )}
                     <h1 className="font-bold text-lg mb-1">{storeName}</h1>
@@ -102,10 +104,12 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                         <span>Subtotal</span>
                         <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
                     </div>
-                    <div className="flex justify-between">
-                        <span>Tax ({settings.taxRate}%)</span>
-                        <span>{formatCurrencyWithSettings(tax, settings)}</span>
-                    </div>
+                    {tax > 0 && (
+                        <div className="flex justify-between">
+                            <span>Tax ({settings.taxRate}%)</span>
+                            <span>{formatCurrencyWithSettings(tax, settings)}</span>
+                        </div>
+                    )}
                     {discountAmount && discountAmount > 0 && (
                         <div className="flex justify-between text-green-700">
                             <span>Discount{discountName ? ` (${discountName})` : ''}</span>

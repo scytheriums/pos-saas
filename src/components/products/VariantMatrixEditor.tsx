@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, X, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 interface OptionValue {
     id: string;
@@ -27,6 +28,7 @@ interface Variant {
     price: number;
     cost: number;
     stock: number;
+    imageUrl?: string | null;
 }
 
 interface VariantMatrixEditorProps {
@@ -86,7 +88,8 @@ export function VariantMatrixEditor({
             sku: '',
             price: 0,
             cost: 0,
-            stock: 0
+            stock: 0,
+            imageUrl: null
         }));
     };
 
@@ -139,7 +142,7 @@ export function VariantMatrixEditor({
         onOptionsChange(updatedOptions);
     };
 
-    const updateVariant = (variantId: string, field: 'sku' | 'price' | 'cost' | 'stock', value: string | number) => {
+    const updateVariant = (variantId: string, field: 'sku' | 'price' | 'cost' | 'stock' | 'imageUrl', value: string | number | null) => {
         const updatedVariants = variants.map(v => {
             if (v.id === variantId) {
                 return { ...v, [field]: value };
@@ -322,6 +325,7 @@ export function VariantMatrixEditor({
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Variant</TableHead>
+                                        <TableHead className="w-[80px]">Image</TableHead>
                                         <TableHead>SKU *</TableHead>
                                         <TableHead>Price (Rp) *</TableHead>
                                         <TableHead>Cost (Rp)</TableHead>
@@ -329,10 +333,28 @@ export function VariantMatrixEditor({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {variants.map(variant => (
+                                    {variants.map((variant, index) => (
                                         <TableRow key={variant.id}>
                                             <TableCell className="font-medium">
-                                                {getVariantLabel(variant)}
+                                                <div className="flex flex-wrap gap-1">
+                                                    {variant.optionValueIds.map(id => {
+                                                        for (const option of options) {
+                                                            const val = option.values.find(v => v.id === id);
+                                                            if (val) return <Badge key={id} variant="outline" className="text-xs">{val.value}</Badge>;
+                                                        }
+                                                        return null;
+                                                    })}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="w-10 h-10">
+                                                    <ImageUpload
+                                                        value={variant.imageUrl || undefined}
+                                                        onChange={(url) => updateVariant(variant.id, 'imageUrl', url)}
+                                                        type="product"
+                                                        minimal
+                                                    />
+                                                </div>
                                             </TableCell>
                                             <TableCell>
                                                 <Input

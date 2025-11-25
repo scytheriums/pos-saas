@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/utils";
+import { PackageOpen } from "lucide-react";
 
 type Option = {
     id: string;
@@ -15,6 +16,7 @@ type Variant = {
     price: number;
     stock: number;
     optionValues: any[];
+    imageUrl?: string | null;
 };
 
 interface VariantSelectorProps {
@@ -124,16 +126,28 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
                     )}
 
                     {selectedVariant && (
-                        <div className="mt-4 p-4 bg-muted rounded-lg">
-                            <div className="flex justify-between items-center">
-                                <span className="font-medium">Price:</span>
-                                <span className="text-xl font-bold text-primary">{formatCurrency(selectedVariant.price)}</span>
+                        <div className="mt-4 p-4 bg-muted rounded-lg flex gap-4">
+                            <div className="w-20 h-20 bg-white rounded-md border overflow-hidden shrink-0 flex items-center justify-center">
+                                {selectedVariant.imageUrl ? (
+                                    <img src={selectedVariant.imageUrl} alt={selectedVariant.sku} className="w-full h-full object-cover" />
+                                ) : (
+                                    <PackageOpen className="w-8 h-8 text-gray-300" />
+                                )}
                             </div>
-                            <div className="flex justify-between items-center mt-2 text-sm">
-                                <span className="text-muted-foreground">Stock:</span>
-                                <span className={selectedVariant.stock > 0 ? "text-green-600" : "text-red-600"}>
-                                    {selectedVariant.stock} units
-                                </span>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-medium">Price:</span>
+                                    <span className="text-xl font-bold text-primary">{formatCurrency(selectedVariant.price)}</span>
+                                </div>
+                                <div className="flex justify-between items-center mt-2 text-sm">
+                                    <span className="text-muted-foreground">Stock:</span>
+                                    <span className={selectedVariant.stock > 0 ? "text-green-600" : "text-red-600"}>
+                                        {selectedVariant.stock} units
+                                    </span>
+                                </div>
+                                <div className="mt-1 text-xs text-gray-500">
+                                    SKU: {selectedVariant.sku}
+                                </div>
                             </div>
                         </div>
                     )}

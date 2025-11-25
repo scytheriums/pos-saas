@@ -284,6 +284,7 @@ export default function OrderDetailsPage() {
                 headerText={tenant?.receiptHeader}
                 footerText={tenant?.receiptFooter}
                 showLogo={tenant?.showLogo !== false}
+                logoUrl={tenant?.logoUrl}
                 orderId={order.id}
                 date={new Date(order.createdAt)}
                 cashierName={order.cashierName || "Cashier"}

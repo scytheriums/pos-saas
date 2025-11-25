@@ -12,11 +12,13 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
 import { ReceiptTemplate } from '@/components/pos/ReceiptTemplate';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 const receiptFormSchema = z.object({
     receiptHeader: z.string().optional(),
     receiptFooter: z.string().optional(),
     showLogo: z.boolean().default(true),
+    logoUrl: z.string().optional(),
 });
 
 type ReceiptFormValues = z.infer<typeof receiptFormSchema>;
@@ -33,6 +35,7 @@ export default function ReceiptSettingsPage() {
             receiptHeader: "",
             receiptFooter: "",
             showLogo: true,
+            logoUrl: "",
         },
     });
 
@@ -58,7 +61,8 @@ export default function ReceiptSettingsPage() {
                 form.reset({
                     receiptHeader: data.receiptHeader || "",
                     receiptFooter: data.receiptFooter || "",
-                    showLogo: data.showLogo !== false, // Default to true if undefined
+                    showLogo: data.showLogo !== false,
+                    logoUrl: data.logoUrl || "",
                 });
             }
         } catch (error) {
@@ -146,6 +150,27 @@ export default function ReceiptSettingsPage() {
                                     />
                                     <FormField
                                         control={form.control}
+                                        name="logoUrl"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Business Logo</FormLabel>
+                                                <FormControl>
+                                                    <ImageUpload
+                                                        value={field.value}
+                                                        onChange={field.onChange}
+                                                        type="logo"
+                                                        disabled={saving}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Upload your business logo to display on receipts.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
                                         name="receiptHeader"
                                         render={({ field }) => (
                                             <FormItem>
@@ -218,6 +243,7 @@ export default function ReceiptSettingsPage() {
                                 headerText={watchedValues.receiptHeader}
                                 footerText={watchedValues.receiptFooter}
                                 showLogo={watchedValues.showLogo}
+                                logoUrl={watchedValues.logoUrl}
                                 isPreview={true}
                             />
                         </div>

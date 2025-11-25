@@ -57,7 +57,7 @@ export async function PATCH(
         const { tenantId } = authResult.user;
 
         const body = await req.json();
-        const { sku, price, cost, stock } = body;
+        const { sku, price, cost, stock, imageUrl } = body;
 
         // Verify variant belongs to tenant's product
         const variant = await prisma.productVariant.findFirst({
@@ -80,7 +80,8 @@ export async function PATCH(
                 sku,
                 price: new Prisma.Decimal(price),
                 cost: cost !== undefined ? new Prisma.Decimal(cost) : undefined,
-                stock
+                stock,
+                imageUrl: imageUrl !== undefined ? imageUrl : undefined
             }
         });
 

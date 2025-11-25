@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
         const { tenantId } = authResult.user;
 
         const body = await req.json();
-        const { name, description, hasVariants, options, variants, minStock, categoryId } = body;
+        const { name, description, imageUrl, hasVariants, options, variants, minStock, categoryId } = body;
 
         console.log('Creating product payload:', JSON.stringify({
             name,
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     name,
                     description,
+                    imageUrl: imageUrl || null,
                     minStock: minStock || 10,
                     categoryId: categoryId || null,
                     tenantId,
@@ -176,6 +177,7 @@ export async function POST(req: NextRequest) {
                                 price: new Prisma.Decimal(variant.price),
                                 cost: new Prisma.Decimal(variant.cost || 0),
                                 stock: variant.stock,
+                                imageUrl: variant.imageUrl || null,
                                 optionValues: {
                                     connect: optionValueIds.map(id => ({ id }))
                                 }
@@ -268,6 +270,7 @@ export async function GET(req: NextRequest) {
                     id: true,
                     name: true,
                     description: true,
+                    imageUrl: true,
                     minStock: true,
                     categoryId: true,
                     tenantId: true,
@@ -290,6 +293,7 @@ export async function GET(req: NextRequest) {
                             sku: true,
                             price: true,
                             stock: true,
+                            imageUrl: true,
                             optionValues: {
                                 select: {
                                     id: true,

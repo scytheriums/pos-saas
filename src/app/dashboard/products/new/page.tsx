@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { VariantMatrixEditor } from '@/components/products/VariantMatrixEditor';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 interface VariantData {
     id: string;
@@ -20,6 +21,7 @@ interface VariantData {
     price: number;
     cost: number;
     stock: number;
+    imageUrl?: string | null;
 }
 
 interface OptionData {
@@ -33,9 +35,9 @@ export default function NewProductPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Basic product info
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [minStock, setMinStock] = useState(10);
     const [categoryId, setCategoryId] = useState<string>('');
 
@@ -90,6 +92,7 @@ export default function NewProductPage() {
             const payload = {
                 name,
                 description,
+                imageUrl,
                 minStock,
                 categoryId: categoryId === '__none__' ? null : (categoryId || null),
                 hasVariants,
@@ -103,7 +106,8 @@ export default function NewProductPage() {
                         sku: v.sku,
                         price: v.price,
                         cost: v.cost,
-                        stock: v.stock
+                        stock: v.stock,
+                        imageUrl: v.imageUrl
                     }))
                 } : {
                     options: [],
@@ -176,6 +180,15 @@ export default function NewProductPage() {
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Product description..."
                                 rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Product Image</Label>
+                            <ImageUpload
+                                value={imageUrl || undefined}
+                                onChange={(url) => setImageUrl(url)}
+                                type="product"
+                                disabled={loading}
                             />
                         </div>
                         <div className="space-y-2">

@@ -34,6 +34,7 @@ interface Product {
     id: string;
     name: string;
     description: string | null;
+    imageUrl: string | null;
     minStock: number;
     tenantId: string;
     categoryId: string | null;
@@ -279,7 +280,17 @@ export default function ProductsPage() {
                         const stockStatus = getStockStatus(product);
                         const totalStock = getTotalStock(product);
                         return (
-                            <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                            <Card key={product.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+                                {/* Product Image */}
+                                {product.imageUrl && (
+                                    <div className="w-full h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
+                                        <img
+                                            src={product.imageUrl}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                )}
                                 <CardHeader className="p-4 pb-2">
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
