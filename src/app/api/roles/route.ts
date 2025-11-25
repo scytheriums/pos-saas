@@ -95,9 +95,10 @@ export async function POST(req: NextRequest) {
         // Log audit
         await logAudit({
             userId: user.id,
+            userName: user.name,
             tenantId,
             action: 'CREATE',
-            resource: 'Role',
+            resource: 'ROLE',
             resourceId: role.id,
             details: { name: role.name }
         });

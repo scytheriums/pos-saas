@@ -102,9 +102,10 @@ export async function PATCH(
         // Log audit
         await logAudit({
             userId: user.id,
+            userName: user.name,
             tenantId,
             action: 'UPDATE',
-            resource: 'Role',
+            resource: 'ROLE',
             resourceId: role.id,
             details: { name: role.name }
         });
@@ -165,10 +166,11 @@ export async function DELETE(
         // Log audit
         await logAudit({
             userId: user.id,
+            userName: user.name,
             tenantId,
             action: 'DELETE',
-            resource: 'Role',
-            resourceId: role.id,
+            resource: 'ROLE',
+            resourceId: params.id,
             details: { name: role.name }
         });
 
