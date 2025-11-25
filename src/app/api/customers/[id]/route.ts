@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import { logCrudAudit } from "@/lib/audit";
 
 // GET /api/customers/[id] - Get customer details
 export async function GET(
@@ -99,6 +100,18 @@ export async function PATCH(
             where: { id: params.id },
         });
 
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "UPDATE",
+            resource: "CUSTOMER",
+            resourceId: params.id,
+            after: { name, phone, email, address, points },
+            request: req
+        });
+
         return NextResponse.json({ customer: updatedCustomer });
     } catch (error: any) {
         console.error("Failed to update customer:", error);
@@ -151,6 +164,18 @@ export async function DELETE(
             where: {
                 id: params.id,
             },
+        });
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "DELETE",
+            resource: "CUSTOMER",
+            resourceId: params.id,
+            before: { name: customerToDelete.name, phone: customerToDelete.phone, email: customerToDelete.email },
+            request: req
         });
 
         return NextResponse.json({ message: "Customer deleted successfully" });

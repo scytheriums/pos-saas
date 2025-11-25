@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import { logCrudAudit } from "@/lib/audit";
 
 // GET /api/customers - List customers with search
 export async function GET(req: NextRequest) {
@@ -81,6 +82,18 @@ export async function POST(req: NextRequest) {
                 address,
                 tenantId,
             },
+        });
+
+        // Log audit trail
+        await logCrudAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "CREATE",
+            resource: "CUSTOMER",
+            resourceId: customer.id,
+            after: { name, phone, email },
+            request: req
         });
 
         return NextResponse.json({ customer }, { status: 201 });

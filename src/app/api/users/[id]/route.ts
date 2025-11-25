@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, hasRole } from '@/lib/auth';
 import { clerkClient } from '@clerk/nextjs/server';
+import { logAudit } from '@/lib/audit';
 
 export async function DELETE(
     req: NextRequest,
@@ -41,6 +42,21 @@ export async function DELETE(
                 tenantId: null,
                 role: null,
             },
+        });
+
+        // Log audit trail
+        await logAudit({
+            tenantId,
+            userId,
+            userName: authResult.user.name,
+            action: "DELETE",
+            resource: "USER",
+            resourceId: userIdToRemove,
+            details: {
+                removedUserEmail: userToRemove.emailAddresses[0]?.emailAddress,
+                removedUserRole: userToRemove.publicMetadata.role
+            },
+            request: req
         });
 
         return NextResponse.json({ message: 'User removed successfully' });

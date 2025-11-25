@@ -34,6 +34,9 @@ export async function PATCH(
             }, { status: 400 });
         }
 
+        // Count items for logging
+        const itemsCount = returnRecord.items.length;
+
         // Process return approval in transaction
         const updatedReturn = await prisma.$transaction(async (tx) => {
             // 1. Update return status to APPROVED
@@ -118,7 +121,7 @@ export async function PATCH(
                 action: "APPROVED",
                 refundAmount: Number(updatedReturn.refundAmount),
                 refundMethod: updatedReturn.refundMethod,
-                itemsRestocked: updatedReturn.items.length
+                itemsRestocked: itemsCount
             },
             request: req
         });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, hasRole } from '@/lib/auth';
 import { clerkClient } from '@clerk/nextjs/server';
+import { logAudit } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
     try {
@@ -36,6 +37,22 @@ export async function POST(req: NextRequest) {
                 role: inviteRole,
             },
             redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
+        });
+
+        // Log audit trail
+        await logAudit({
+            tenantId,
+            userId: authResult.user.id,
+            userName: authResult.user.name,
+            action: "CREATE",
+            resource: "USER",
+            resourceId: invitation.id,
+            details: {
+                email,
+                role: inviteRole,
+                invitationType: "INVITATION"
+            },
+            request: req
         });
 
         return NextResponse.json({
