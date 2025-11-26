@@ -31,7 +31,7 @@ export default function RootLayout({
       signUpFallbackRedirectUrl="/onboarding"
       signInFallbackRedirectUrl="/dashboard/analytics"
     >
-      <html lang="en">
+      <html lang="en" className="scroll-smooth">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
