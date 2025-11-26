@@ -4,6 +4,7 @@ import { useState, useRef, ChangeEvent, DragEvent } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 interface ImageUploadProps {
     value?: string; // Current image URL
@@ -113,7 +114,13 @@ export function ImageUpload({ value, onChange, type, className, disabled, minima
                     {uploading ? (
                         <Loader2 className="h-3 w-3 animate-spin text-primary" />
                     ) : value ? (
-                        <img src={value} alt="Variant" className="w-full h-full object-cover" />
+                        <Image
+                            src={value}
+                            alt="Variant"
+                            fill
+                            className="object-cover"
+                            sizes="32px"
+                        />
                     ) : (
                         <ImageIcon className="h-4 w-4 text-gray-400" />
                     )}
@@ -139,10 +146,12 @@ export function ImageUpload({ value, onChange, type, className, disabled, minima
             {value ? (
                 <div className="relative group">
                     <div className="relative w-full h-48 rounded-lg border-2 border-gray-200 overflow-hidden bg-gray-50">
-                        <img
+                        <Image
                             src={value}
                             alt="Uploaded image"
-                            className="w-full h-full object-contain"
+                            fill
+                            className="object-contain"
+                            sizes="(max-width: 768px) 100vw, 400px"
                         />
                     </div>
                     <Button

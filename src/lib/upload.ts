@@ -38,7 +38,7 @@ export async function saveImage(file: File, subfolder: 'logos' | 'products'): Pr
 
         // Convert File to Buffer
         const bytes = await file.arrayBuffer();
-        let buffer = Buffer.from(bytes);
+        let buffer = Buffer.from(bytes) as Buffer;
         let extension = file.name.split('.').pop() || 'jpg';
 
         // Optimize image

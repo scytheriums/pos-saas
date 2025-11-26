@@ -1,8 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { PackageOpen } from "lucide-react";
+import Image from "next/image";
 
 type Option = {
     id: string;
@@ -70,12 +71,33 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
 
     const selectedVariant = getSelectedVariant();
 
+    // Auto-select first variant when dialog opens
+    useEffect(() => {
+        if (open && product) {
+            if (hasOptions) {
+                // Auto-select first value for each option
+                const initialOptions: Record<string, string> = {};
+                product.options.forEach(option => {
+                    if (option.values && option.values.length > 0) {
+                        initialOptions[option.id] = option.values[0].id;
+                    }
+                });
+                setSelectedOptions(initialOptions);
+            } else if (product.variants && product.variants.length > 0) {
+                // Auto-select first variant for direct selection
+                setSelectedVariantId(product.variants[0].id);
+            }
+        } else if (!open) {
+            // Reset when dialog closes
+            setSelectedOptions({});
+            setSelectedVariantId(null);
+        }
+    }, [open, product, hasOptions]);
+
     const handleConfirm = () => {
         if (selectedVariant) {
             onAddToCart(selectedVariant);
             onClose();
-            setSelectedOptions({});
-            setSelectedVariantId(null);
         }
     };
 
@@ -84,6 +106,9 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Select Options for {product.name}</DialogTitle>
+                    <DialogDescription>
+                        Choose your preferred options for this product
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     {hasOptions ? (
@@ -127,9 +152,15 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
 
                     {selectedVariant && (
                         <div className="mt-4 p-4 bg-muted rounded-lg flex gap-4">
-                            <div className="w-20 h-20 bg-white rounded-md border overflow-hidden shrink-0 flex items-center justify-center">
+                            <div className="w-20 h-20 bg-white rounded-md border overflow-hidden shrink-0 flex items-center justify-center relative">
                                 {selectedVariant.imageUrl ? (
-                                    <img src={selectedVariant.imageUrl} alt={selectedVariant.sku} className="w-full h-full object-cover" />
+                                    <Image
+                                        src={selectedVariant.imageUrl}
+                                        alt={selectedVariant.sku}
+                                        fill
+                                        className="object-cover"
+                                        sizes="80px"
+                                    />
                                 ) : (
                                     <PackageOpen className="w-8 h-8 text-gray-300" />
                                 )}

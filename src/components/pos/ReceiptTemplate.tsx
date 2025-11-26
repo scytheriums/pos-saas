@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
 import { useTenantSettings } from '@/contexts/SettingsContext';
+import Image from 'next/image';
 
 interface ReceiptItem {
     name: string;
@@ -43,11 +44,13 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                 {/* Header */}
                 <div className="text-center mb-4 border-b border-black pb-2 border-dashed">
                     {showLogo && logoUrl && (
-                        <div className="mb-2 flex justify-center">
-                            <img
+                        <div className="mb-2 flex justify-center relative h-12">
+                            <Image
                                 src={logoUrl}
                                 alt="Business Logo"
-                                className="h-12 w-auto max-w-[120px] object-contain"
+                                width={120}
+                                height={48}
+                                className="object-contain"
                             />
                         </div>
                     )}

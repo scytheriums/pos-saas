@@ -544,7 +544,7 @@ export default function POSPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-6">
-                                    {products.map((product) => (
+                                    {products.map((product, index) => (
                                         <Card
                                             key={product.id}
                                             className="cursor-pointer hover:shadow-lg transition-all duration-200 border-gray-100 group overflow-hidden"
@@ -558,6 +558,7 @@ export default function POSPage() {
                                                         fill
                                                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                                                         sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+                                                        priority={index < 6}
                                                     />
                                                 ) : (
                                                     <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gray-50 group-hover:scale-105 transition-transform duration-300">

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import Image from 'next/image';
 
 interface Step1Props {
     form: UseFormReturn<any>;
@@ -105,8 +106,14 @@ export function Step1BusinessInfo({ form }: Step1Props) {
                     <FormLabel>Business Logo (Optional)</FormLabel>
                     <div className="flex items-center gap-4">
                         {logoPreview && (
-                            <div className="h-20 w-20 rounded-lg border-2 border-border overflow-hidden">
-                                <img src={logoPreview} alt="Logo preview" className="h-full w-full object-cover" />
+                            <div className="h-20 w-20 rounded-lg border-2 border-border overflow-hidden relative">
+                                <Image
+                                    src={logoPreview}
+                                    alt="Logo preview"
+                                    fill
+                                    className="object-cover"
+                                    sizes="80px"
+                                />
                             </div>
                         )}
                         <div className="flex-1">
