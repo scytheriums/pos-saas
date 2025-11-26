@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, CheckCircle, XCircle, Package } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import { toast } from "sonner";
 
 export default function ReturnDetailsPage() {
     const params = useParams();
@@ -31,7 +32,7 @@ export default function ReturnDetailsPage() {
             const data = await response.json();
             setReturnData(data);
         } catch (error) {
-            console.error("Error fetching return:", error);
+            toast.error("Failed to fetch return");
         } finally {
             setLoading(false);
         }
@@ -53,11 +54,10 @@ export default function ReturnDetailsPage() {
                 return;
             }
 
-            alert("Return approved successfully!");
+            toast.success("Return approved successfully!");
             fetchReturnDetails();
         } catch (error) {
-            console.error("Error approving return:", error);
-            alert("Failed to approve return");
+            toast.error("Failed to approve return");
         }
     };
 
@@ -78,11 +78,10 @@ export default function ReturnDetailsPage() {
                 return;
             }
 
-            alert("Return rejected successfully!");
+            toast.success("Return rejected successfully!");
             fetchReturnDetails();
         } catch (error) {
-            console.error("Error rejecting return:", error);
-            alert("Failed to reject return");
+            toast.error("Failed to reject return");
         }
     };
 

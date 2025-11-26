@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { PermissionAction, PermissionResource } from "@prisma/client";
+import { toast } from "sonner";
 
 interface RoleDialogProps {
     open: boolean;
@@ -60,7 +61,7 @@ export function RoleDialog({ open, onClose, role, onSuccess }: RoleDialogProps) 
 
     const handleSubmit = async () => {
         if (!name.trim()) {
-            alert("Role name is required");
+            toast.error("Role name is required");
             return;
         }
 
@@ -79,10 +80,10 @@ export function RoleDialog({ open, onClose, role, onSuccess }: RoleDialogProps) 
                 onSuccess();
             } else {
                 const data = await res.json();
-                alert(data.error);
+                toast.error(data.error);
             }
         } catch (error) {
-            console.error('Failed to save role', error);
+            toast.error("Failed to save role");
         } finally {
             setLoading(false);
         }

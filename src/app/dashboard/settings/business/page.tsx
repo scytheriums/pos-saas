@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 
 const businessFormSchema = z.object({
     name: z.string().min(2, { message: "Business name must be at least 2 characters." }),
@@ -62,6 +63,7 @@ export default function BusinessProfilePage() {
             }
         } catch (error) {
             console.error("Failed to fetch settings:", error);
+            toast.error("Failed to load business settings");
         } finally {
             setLoading(false);
         }
@@ -77,13 +79,13 @@ export default function BusinessProfilePage() {
             });
 
             if (res.ok) {
-                alert("Settings saved successfully!");
+                toast.success("Settings saved successfully!");
             } else {
-                alert("Failed to save settings.");
+                toast.error("Failed to save settings.");
             }
         } catch (error) {
             console.error("Error saving settings:", error);
-            alert("An error occurred while saving.");
+            toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
         }

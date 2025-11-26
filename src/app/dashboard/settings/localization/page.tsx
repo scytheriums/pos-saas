@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
 import { formatCurrencyWithSettings, formatDateWithSettings, formatTimeWithSettings } from '@/lib/format';
 import { TenantSettings } from '@/contexts/SettingsContext';
+import { toast } from 'sonner';
 
 const localizationFormSchema = z.object({
     language: z.string().default("en"),
@@ -59,7 +60,7 @@ export default function LocalizationSettingsPage() {
                 });
             }
         } catch (error) {
-            console.error("Failed to fetch settings:", error);
+            toast.error("Failed to fetch settings.");
         } finally {
             setLoading(false);
         }
@@ -75,13 +76,12 @@ export default function LocalizationSettingsPage() {
             });
 
             if (res.ok) {
-                alert("Localization settings saved successfully!");
+                toast.success("Localization settings saved successfully!");
             } else {
-                alert("Failed to save settings.");
+                toast.error("Failed to save settings.");
             }
         } catch (error) {
-            console.error("Error saving settings:", error);
-            alert("An error occurred while saving.");
+            toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
         }

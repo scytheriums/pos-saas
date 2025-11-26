@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, ArrowLeft, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CreateReturnPage() {
     const router = useRouter();
@@ -144,7 +145,7 @@ export default function CreateReturnPage() {
             }
 
             const returnData = await response.json();
-            alert("Return created successfully!");
+            toast.success("Return created successfully!");
             router.push(`/dashboard/returns/${returnData.id}`);
         } catch (err) {
             setError("Failed to create return");

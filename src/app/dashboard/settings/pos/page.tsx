@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const posFormSchema = z.object({
     autoPrintReceipt: z.boolean().optional().default(true),
@@ -49,7 +50,7 @@ export default function PosSettingsPage() {
                 });
             }
         } catch (error) {
-            console.error("Failed to fetch settings:", error);
+            toast.error("Failed to fetch settings.");
         } finally {
             setLoading(false);
         }
@@ -65,13 +66,12 @@ export default function PosSettingsPage() {
             });
 
             if (res.ok) {
-                alert("POS settings saved successfully!");
+                toast.success("POS settings saved successfully!");
             } else {
-                alert("Failed to save settings.");
+                toast.error("Failed to save settings.");
             }
         } catch (error) {
-            console.error("Error saving settings:", error);
-            alert("An error occurred while saving.");
+            toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
         }

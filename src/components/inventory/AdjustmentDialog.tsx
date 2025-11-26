@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Loader2, X } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface AdjustmentDialogProps {
     onAdjustmentCreated: () => void;
@@ -44,7 +45,7 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
                     setProducts(data.products || []);
                 }
             } catch (error) {
-                console.error("Failed to search products", error);
+                toast.error("Failed to search products");
             } finally {
                 setLoading(false);
             }
@@ -61,7 +62,7 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
 
         const targetVariant = variant || product.variants?.[0];
         if (!targetVariant) {
-            alert("This product has no valid variants to adjust.");
+            toast.error("This product has no valid variants to adjust.");
             return;
         }
 
@@ -98,8 +99,7 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
             resetForm();
             onAdjustmentCreated();
         } catch (error) {
-            console.error(error);
-            alert("Failed to create adjustment");
+            toast.error("Failed to create adjustment");
         } finally {
             setSubmitting(false);
         }

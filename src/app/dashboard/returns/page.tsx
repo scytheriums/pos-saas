@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, ChevronLeft, ChevronRight, Eye, CheckCircle, XCircle, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface Return {
     id: string;
@@ -92,11 +93,11 @@ export default function ReturnsPage() {
                 return;
             }
 
-            alert("Return approved successfully!");
+            toast.success("Return approved successfully!");
             fetchReturns();
         } catch (error) {
             console.error("Error approving return:", error);
-            alert("Failed to approve return");
+            toast.error("Failed to approve return");
         }
     };
 
@@ -113,15 +114,15 @@ export default function ReturnsPage() {
 
             if (!response.ok) {
                 const error = await response.json();
-                alert(error.error || "Failed to reject return");
+                toast.error(error.error || "Failed to reject return");
                 return;
             }
 
-            alert("Return rejected successfully!");
+            toast.success("Return rejected successfully!");
             fetchReturns();
         } catch (error) {
             console.error("Error rejecting return:", error);
-            alert("Failed to reject return");
+            toast.error("Failed to reject return");
         }
     };
 

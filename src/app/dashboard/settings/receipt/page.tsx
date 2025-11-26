@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
 import { ReceiptTemplate } from '@/components/pos/ReceiptTemplate';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { toast } from 'sonner';
 
 const receiptFormSchema = z.object({
     receiptHeader: z.string().optional(),
@@ -66,7 +67,7 @@ export default function ReceiptSettingsPage() {
                 });
             }
         } catch (error) {
-            console.error("Failed to fetch settings:", error);
+            toast.error("Failed to fetch settings.");
         } finally {
             setLoading(false);
         }
@@ -82,13 +83,12 @@ export default function ReceiptSettingsPage() {
             });
 
             if (res.ok) {
-                alert("Receipt settings saved successfully!");
+                toast.success("Receipt settings saved successfully!");
             } else {
-                alert("Failed to save settings.");
+                toast.error("Failed to save settings.");
             }
         } catch (error) {
-            console.error("Error saving settings:", error);
-            alert("An error occurred while saving.");
+            toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
         }
