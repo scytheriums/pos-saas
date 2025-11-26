@@ -80,7 +80,7 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
     };
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
+        <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Select Options for {product.name}</DialogTitle>

@@ -15,6 +15,7 @@ import {
     Filter,
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -281,17 +282,21 @@ export default function ProductsPage() {
                         const totalStock = getTotalStock(product);
                         return (
                             <Card key={product.id} className="hover:shadow-lg transition-shadow overflow-hidden">
-                                {/* Product Image */}
-                                {product.imageUrl && (
-                                    <div className="w-full h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
-                                        <img
+                                {/* Product Image - Always show for consistency */}
+                                <div className="aspect-square w-full bg-gray-100 flex items-center justify-center overflow-hidden relative">
+                                    {product.imageUrl ? (
+                                        <Image
                                             src={product.imageUrl}
                                             alt={product.name}
-                                            className="w-full h-full object-cover"
+                                            fill
+                                            className="object-cover"
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                         />
-                                    </div>
-                                )}
-                                <CardHeader className="p-4 pb-2">
+                                    ) : (
+                                        <Package className="w-12 h-12 text-gray-300" />
+                                    )}
+                                </div>
+                                <CardHeader className="p-3 pb-2">
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
                                             <CardTitle className="text-base">{product.name}</CardTitle>
@@ -304,8 +309,8 @@ export default function ProductsPage() {
                                         <Badge variant={stockStatus.variant} className="text-[10px] px-1.5 py-0.5">{stockStatus.label}</Badge>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-2">
-                                    <div className="space-y-2">
+                                <CardContent className="p-3 pt-1">
+                                    <div className="space-y-1.5">
                                         <div className="flex items-center justify-between text-xs">
                                             <span className="text-muted-foreground">Variants</span>
                                             <span className="font-medium">{product.variants.length}</span>

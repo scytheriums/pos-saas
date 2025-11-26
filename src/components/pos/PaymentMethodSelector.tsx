@@ -59,7 +59,7 @@ export function PaymentMethodSelector({ open, onClose, total, onConfirm, selecte
     ].filter((amount, index, self) => self.indexOf(amount) === index); // Remove duplicates
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
+        <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle>Select Payment Method</DialogTitle>

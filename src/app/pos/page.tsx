@@ -11,6 +11,7 @@ import { PaymentMethodSelector } from "@/components/pos/PaymentMethodSelector";
 import { OfflineIndicator } from "@/components/pos/OfflineIndicator";
 import { db } from "@/lib/db";
 import Link from "next/link";
+import Image from "next/image";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { VariantSelector } from "@/components/pos/VariantSelector";
 import { cn } from "@/lib/utils";
@@ -551,10 +552,12 @@ export default function POSPage() {
                                         >
                                             <div className="aspect-square bg-gray-100 relative overflow-hidden">
                                                 {product.imageUrl ? (
-                                                    <img
+                                                    <Image
                                                         src={product.imageUrl}
                                                         alt={product.name}
-                                                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        fill
+                                                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
                                                     />
                                                 ) : (
                                                     <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gray-50 group-hover:scale-105 transition-transform duration-300">
@@ -655,7 +658,13 @@ export default function POSPage() {
                                         <div key={(item.variantId || item.id)} className="flex gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm group hover:border-primary/20 transition-colors">
                                             <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden relative">
                                                 {item.imageUrl ? (
-                                                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                                    <Image
+                                                        src={item.imageUrl}
+                                                        alt={item.name}
+                                                        fill
+                                                        className="object-cover"
+                                                        sizes="48px"
+                                                    />
                                                 ) : (
                                                     <PackageOpen className="w-6 h-6 text-gray-400" />
                                                 )}

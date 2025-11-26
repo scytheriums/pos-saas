@@ -1,6 +1,7 @@
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
+import { optimizeImage } from '@/lib/image-optimizer';
 
 const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -35,14 +36,23 @@ export async function saveImage(file: File, subfolder: 'logos' | 'products'): Pr
             return { success: false, error: validation.error };
         }
 
-        // Generate unique filename
-        const extension = file.name.split('.').pop() || 'jpg';
-        const filename = `${randomUUID()}.${extension}`;
-        const filepath = join(UPLOAD_DIR, subfolder, filename);
-
         // Convert File to Buffer
         const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        let buffer = Buffer.from(bytes);
+        let extension = file.name.split('.').pop() || 'jpg';
+
+        // Optimize image
+        try {
+            buffer = await optimizeImage(buffer);
+            extension = 'webp'; // Optimization converts to webp
+        } catch (optError) {
+            console.error('Image optimization failed, falling back to original:', optError);
+            // Fallback to original buffer if optimization fails
+        }
+
+        // Generate unique filename
+        const filename = `${randomUUID()}.${extension}`;
+        const filepath = join(UPLOAD_DIR, subfolder, filename);
 
         // Save file
         await writeFile(filepath, buffer);
