@@ -21,6 +21,7 @@ import { useTenantSettings } from "@/contexts/SettingsContext";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
+import { toast } from "sonner";
 
 // Sound effect helper
 const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
@@ -114,19 +115,7 @@ export default function POSPage() {
                 console.error("Failed to fetch tenant details", error);
             }
         }
-        async function fetchUser() {
-            try {
-                const res = await fetch('/api/auth/me');
-                if (res.ok) {
-                    const data = await res.json();
-                    setCurrentUser(data);
-                }
-            } catch (error) {
-                console.error("Failed to fetch user details", error);
-            }
-        }
         fetchTenant();
-        fetchUser();
     }, []);
 
     // Receipt state
@@ -327,7 +316,7 @@ export default function POSPage() {
                 setAppliedDiscount(data.discount);
                 setDiscountAmount(data.discountAmount);
                 playSound('success', settings);
-                // alert(`Discount applied: ${data.discount.name}`); // Removed alert for better UX
+                toast.success(`Discount applied: ${data.discount.name}`);
             } else {
                 const error = await res.json();
                 setDiscountError(error.error || 'Invalid discount code');
@@ -338,6 +327,7 @@ export default function POSPage() {
         } catch (error) {
             console.error('Failed to validate discount', error);
             setDiscountError('Failed to validate discount code');
+            toast.error('Failed to validate discount code. Please try again.');
         } finally {
             setValidatingDiscount(false);
         }
@@ -388,7 +378,7 @@ export default function POSPage() {
         setLastOrder({
             orderId: orderId,
             date: new Date(),
-            cashierName: currentUser?.name || cashierName,
+            cashierName: cashierName,
             items: cart.map(item => ({
                 name: item.name,
                 quantity: item.quantity,
@@ -409,7 +399,10 @@ export default function POSPage() {
         }
         playSound('success', settings);
 
-        alert(isOffline ? 'Order saved offline! It will sync when online.' : `Order ${orderId} completed successfully!`);
+        const message = isOffline
+            ? 'Order saved offline! It will sync when online.'
+            : `Order ${orderId} completed successfully!`;
+        toast.success(message);
 
         // Reset cart and discount state
         setCart([]);
@@ -475,7 +468,7 @@ export default function POSPage() {
             }
         } catch (error) {
             console.error("Checkout error:", error);
-            alert("Checkout failed. Please try again.");
+            toast.error("Checkout failed. Please try again.");
         } finally {
             setLoading(false);
         }

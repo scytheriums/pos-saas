@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,6 +40,9 @@ export default function RootLayout({
               {children}
             </SettingsProvider>
           </LanguageProvider>
+          <div className="print:hidden">
+            <Toaster position="top-right" richColors />
+          </div>
         </body>
       </html>
     </ClerkProvider>
