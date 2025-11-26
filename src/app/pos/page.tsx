@@ -11,7 +11,6 @@ import { PaymentMethodSelector } from "@/components/pos/PaymentMethodSelector";
 import { OfflineIndicator } from "@/components/pos/OfflineIndicator";
 import { db } from "@/lib/db";
 import Link from "next/link";
-import Image from "next/image";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { VariantSelector } from "@/components/pos/VariantSelector";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,6 @@ import { useTenantSettings } from "@/contexts/SettingsContext";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
-import { toast } from "sonner";
 
 // Sound effect helper
 const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
@@ -60,17 +58,7 @@ const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
     }
 };
 
-
-type CartItem = {
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-    variantId?: string;
-    variantName?: string;
-    sku?: string;
-    imageUrl?: string | null;
-};
+type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string };
 type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: number };
 
 export default function POSPage() {
@@ -94,7 +82,6 @@ export default function POSPage() {
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
     const [tenant, setTenant] = useState<any>(null);
-    const [currentUser, setCurrentUser] = useState<any>(null);
 
     // Pagination state
     const [page, setPage] = useState(1);
@@ -209,24 +196,12 @@ export default function POSPage() {
     }, [heldCarts, mounted]);
 
     const addToCart = (product: any, variant?: any) => {
-        // Helper to get variant display name
-        const getVariantName = () => {
-            if (!variant) return undefined;
-            if (variant.optionValues && variant.optionValues.length > 0) {
-                return variant.optionValues.map((ov: any) => ov.value).join(' / ');
-            }
-            return variant.sku || 'Variant';
-        };
-
-        const itemToAdd: CartItem = {
+        const itemToAdd = {
             id: product.id,
             name: product.name,
             price: variant ? variant.price : product.price,
             quantity: 1,
-            variantId: variant?.id,
-            variantName: getVariantName(),
-            sku: variant?.sku,
-            imageUrl: variant?.imageUrl || product.imageUrl
+            variantId: variant?.id
         };
 
         setCart((prev) => {
@@ -316,7 +291,7 @@ export default function POSPage() {
                 setAppliedDiscount(data.discount);
                 setDiscountAmount(data.discountAmount);
                 playSound('success', settings);
-                toast.success(`Discount applied: ${data.discount.name}`);
+                // alert(`Discount applied: ${data.discount.name}`); // Removed alert for better UX
             } else {
                 const error = await res.json();
                 setDiscountError(error.error || 'Invalid discount code');
@@ -327,7 +302,6 @@ export default function POSPage() {
         } catch (error) {
             console.error('Failed to validate discount', error);
             setDiscountError('Failed to validate discount code');
-            toast.error('Failed to validate discount code. Please try again.');
         } finally {
             setValidatingDiscount(false);
         }
@@ -383,7 +357,7 @@ export default function POSPage() {
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price,
-                variantName: item.variantName
+                variantName: item.variantId ? "Variant" : undefined
             })),
             subtotal: total,
             tax: tax,
@@ -399,10 +373,7 @@ export default function POSPage() {
         }
         playSound('success', settings);
 
-        const message = isOffline
-            ? 'Order saved offline! It will sync when online.'
-            : `Order ${orderId} completed successfully!`;
-        toast.success(message);
+        alert(isOffline ? 'Order saved offline! It will sync when online.' : `Order ${orderId} completed successfully!`);
 
         // Reset cart and discount state
         setCart([]);
@@ -468,7 +439,7 @@ export default function POSPage() {
             }
         } catch (error) {
             console.error("Checkout error:", error);
-            toast.error("Checkout failed. Please try again.");
+            alert("Checkout failed. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -537,27 +508,17 @@ export default function POSPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-6">
-                                    {products.map((product, index) => (
+                                    {products.map((product) => (
                                         <Card
                                             key={product.id}
                                             className="cursor-pointer hover:shadow-lg transition-all duration-200 border-gray-100 group overflow-hidden"
                                             onClick={() => handleProductClick(product)}
                                         >
                                             <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                                                {product.imageUrl ? (
-                                                    <Image
-                                                        src={product.imageUrl}
-                                                        alt={product.name}
-                                                        fill
-                                                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                                                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
-                                                        priority={index < 6}
-                                                    />
-                                                ) : (
-                                                    <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gray-50 group-hover:scale-105 transition-transform duration-300">
-                                                        <PackageOpen className="w-12 h-12" />
-                                                    </div>
-                                                )}
+                                                {/* Placeholder for product image */}
+                                                <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gray-50 group-hover:scale-105 transition-transform duration-300">
+                                                    <PackageOpen className="w-12 h-12" />
+                                                </div>
                                                 <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold text-primary shadow-sm">
                                                     {formatCurrencyWithSettings(product.price || product.variants?.[0]?.price || 0, settings)}
                                                 </div>
@@ -650,18 +611,8 @@ export default function POSPage() {
                                 <div className="space-y-3">
                                     {cart.map((item) => (
                                         <div key={(item.variantId || item.id)} className="flex gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm group hover:border-primary/20 transition-colors">
-                                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden relative">
-                                                {item.imageUrl ? (
-                                                    <Image
-                                                        src={item.imageUrl}
-                                                        alt={item.name}
-                                                        fill
-                                                        className="object-cover"
-                                                        sizes="48px"
-                                                    />
-                                                ) : (
-                                                    <PackageOpen className="w-6 h-6 text-gray-400" />
-                                                )}
+                                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                                                <PackageOpen className="w-6 h-6 text-gray-400" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start mb-1">
@@ -802,7 +753,6 @@ export default function POSPage() {
                     headerText={tenant?.receiptHeader}
                     footerText={tenant?.receiptFooter}
                     showLogo={tenant?.showLogo !== false}
-                    logoUrl={tenant?.logoUrl}
                     {...lastOrder}
                 />
             )}

@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
+import { PrinterProvider } from "@/contexts/PrinterContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,6 +20,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Awan POS - Point of Sale System",
   description: "Modern cloud-based POS system for retail and restaurants",
+  manifest: "/manifest.json",
+};
+
+export const viewport = {
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -37,7 +46,9 @@ export default function RootLayout({
         >
           <LanguageProvider>
             <SettingsProvider>
-              {children}
+              <PrinterProvider>
+                {children}
+              </PrinterProvider>
             </SettingsProvider>
           </LanguageProvider>
           <div className="print:hidden">

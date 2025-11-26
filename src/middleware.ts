@@ -22,6 +22,11 @@ export default clerkMiddleware(async (auth, req) => {
 
     // Redirect to sign-in if not authenticated
     if (!userId) {
+        // For API routes, return 401 JSON
+        if (req.nextUrl.pathname.startsWith('/api/')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const signInUrl = new URL('/sign-in', req.url);
         signInUrl.searchParams.set('redirect_url', req.url);
         return NextResponse.redirect(signInUrl);

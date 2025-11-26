@@ -103,7 +103,7 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
 
     return (
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Select Options for {product.name}</DialogTitle>
                     <DialogDescription>
