@@ -1,74 +1,45 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { clerkClient } from '@clerk/nextjs/server';
+﻿import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
+// Simple route matchers
 const isPublicRoute = createRouteMatcher([
     '/sign-in(.*)',
     '/sign-up(.*)',
     '/api/webhooks/clerk',
+    '/api/debug(.*)',
     '/',
     '/privacy',
 ]);
 
-const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)']);
-const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/pos(.*)']);
-
+// Simpler middleware - only handle auth, let page components handle redirects
 export default clerkMiddleware(async (auth, req) => {
-    const { userId, sessionClaims } = await auth();
-    // Allow public routes
+    const { userId } = await auth();
+
+    // Always allow public routes
     if (isPublicRoute(req)) {
         return NextResponse.next();
     }
 
-    // Redirect to sign-in if not authenticated
+    // If not authenticated and trying to access protected route
     if (!userId) {
-        // For API routes, return 401 JSON
+        // For API routes, return 401
         if (req.nextUrl.pathname.startsWith('/api/')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-
+        // For pages, redirect to sign-in
         const signInUrl = new URL('/sign-in', req.url);
-        signInUrl.searchParams.set('redirect_url', req.url);
+        signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
         return NextResponse.redirect(signInUrl);
     }
 
-    // Check session metadata first (fast path - no API call needed)
-    // This works now that Clerk is configured to include publicMetadata in session token
-    let publicMetadata = sessionClaims?.metadata as { tenantId?: string } | undefined;
-    let hasCompletedOnboarding = !!publicMetadata?.tenantId;
-
-    // If session metadata is undefined, fall back to Clerk API
-    // This handles edge cases where session hasn't synced yet
-    if (!hasCompletedOnboarding) {
-        try {
-            const client = await clerkClient();
-            const user = await client.users.getUser(userId);
-            publicMetadata = user.publicMetadata as { tenantId?: string } | undefined;
-            hasCompletedOnboarding = !!publicMetadata?.tenantId;
-        } catch (error) {
-            console.error('Middleware - Error fetching user from Clerk:', error);
-            // If we can't fetch user, continue with session metadata result
-        }
-    }
-
-    // If accessing protected routes without onboarding, redirect to onboarding
-    if (isProtectedRoute(req) && !hasCompletedOnboarding) {
-        return NextResponse.redirect(new URL('/onboarding', req.url));
-    }
-
-    // If accessing onboarding but already completed, redirect to dashboard
-    if (isOnboardingRoute(req) && hasCompletedOnboarding) {
-        return NextResponse.redirect(new URL('/dashboard/analytics', req.url));
-    }
-
+    // Authenticated - let the request through
+    // Page components will handle onboarding redirects
     return NextResponse.next();
 });
 
 export const config = {
     matcher: [
-        // Skip Next.js internals and all static files, unless found in search params
         '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-        // Always run for API routes
         '/(api|trpc)(.*)',
     ],
 };

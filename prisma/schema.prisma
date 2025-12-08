@@ -83,6 +83,12 @@ model Tenant {
   onboardingCompleted Boolean @default(false)
   onboardingStep      Int     @default(0) // Track progress for resume later
 
+  // SKU Auto-Generation Settings
+  autoGenerateSku Boolean @default(false)
+  skuFormat       String  @default("{BUSINESS}/{DATE}/{COUNTER}")
+  skuPrefix       String?
+  skuCounter      Int     @default(1)
+
   users            User[]
   roles            UserRole[]
   products         Product[]

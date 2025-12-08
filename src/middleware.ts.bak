@@ -1,0 +1,83 @@
+﻿import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+
+const isPublicRoute = createRouteMatcher([
+    '/sign-in(.*)',
+    '/sign-up(.*)',
+    '/api/webhooks/clerk',
+    '/api/debug(.*)', // Allow debug endpoints
+    '/',
+    '/privacy',
+]);
+
+const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)']);
+const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/pos(.*)']);
+
+export default clerkMiddleware(async(auth, req) =\u003e {
+    const { userId, sessionClaims } = await auth();
+
+    // Allow public routes
+    if(isPublicRoute(req)) {
+    return NextResponse.next();
+}
+
+// Redirect to sign-in if not authenticated
+if (!userId) {
+    // For API routes, return 401 JSON
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const signInUrl = new URL('/sign-in', req.url);
+    signInUrl.searchParams.set('redirect_url', req.url);
+    return NextResponse.redirect(signInUrl);
+}
+
+// Check session metadata first (fast path - no API call needed)
+let publicMetadata = sessionClaims?.metadata as { tenantId?: string; role?: string } | undefined;
+let hasCompletedOnboarding = !!publicMetadata?.tenantId;
+
+// IMPORTANT: Only fall back to Clerk API if we're not already redirecting
+// and if this is NOT an API request (to avoid slowing down API calls)
+if (!hasCompletedOnboarding && !req.nextUrl.pathname.startsWith('/api/')) {
+    try {
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
+        publicMetadata = user.publicMetadata as { tenantId?: string; role?: string } | undefined;
+        hasCompletedOnboarding = !!publicMetadata?.tenantId;
+    } catch (error) {
+        console.error('Middleware - Error fetching user from Clerk:', error);
+        // If Clerk API fails, allow the request through for dashboard/POS
+        // The pages will handle their own auth checks
+        if (req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/pos')) {
+            return NextResponse.next();
+        }
+    }
+}
+
+// If accessing protected routes without onboarding, redirect to onboarding
+if (isProtectedRoute(req) && !hasCompletedOnboarding) {
+    // Prevent redirect loop: if already heading to onboarding, allow it
+    if (req.nextUrl.pathname.startsWith('/onboarding')) {
+        return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL('/onboarding', req.url));
+}
+
+// If accessing onboarding but already completed, redirect to dashboard
+if (isOnboardingRoute(req) && hasCompletedOnboarding) {
+    return NextResponse.redirect(new URL('/dashboard/analytics', req.url));
+}
+
+return NextResponse.next();
+});
+
+export const config = {
+    matcher: [
+        // Skip Next.js internals and all static files, unless found in search params
+        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+        // Always run for API routes
+        '/(api|trpc)(.*)',
+    ],
+};

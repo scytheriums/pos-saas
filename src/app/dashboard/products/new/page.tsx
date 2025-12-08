@@ -44,6 +44,9 @@ export default function NewProductPage() {
     // Categories
     const [categories, setCategories] = useState<any[]>([]);
 
+    // SKU Settings
+    const [skuSettings, setSkuSettings] = useState<{ autoGenerateSku: boolean; preview: string } | null>(null);
+
     // Fetch categories
     useEffect(() => {
         async function fetchCategories() {
@@ -68,7 +71,24 @@ export default function NewProductPage() {
             }
         }
         fetchCategories();
+        fetchSkuSettings();
     }, []);
+
+    // Fetch SKU settings
+    async function fetchSkuSettings() {
+        try {
+            const res = await fetch('/api/settings/sku');
+            if (res.ok) {
+                const data = await res.json();
+                setSkuSettings({
+                    autoGenerateSku: data.autoGenerateSku,
+                    preview: data.preview
+                });
+            }
+        } catch (error) {
+            console.error('Failed to fetch SKU settings:', error);
+        }
+    }
 
     // Variant toggle
     const [hasVariants, setHasVariants] = useState(false);
@@ -103,7 +123,7 @@ export default function NewProductPage() {
                     })),
                     variants: variants.map(v => ({
                         optionValueIds: v.optionValueIds,
-                        sku: v.sku,
+                        sku: skuSettings?.autoGenerateSku ? '' : v.sku,
                         price: v.price,
                         cost: v.cost,
                         stock: v.stock,
@@ -112,7 +132,7 @@ export default function NewProductPage() {
                 } : {
                     options: [],
                     variants: [{
-                        sku: simpleSku,
+                        sku: skuSettings?.autoGenerateSku ? '' : simpleSku,
                         price: simplePrice,
                         cost: simpleCost,
                         stock: simpleStock
@@ -254,14 +274,19 @@ export default function NewProductPage() {
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="sku">SKU *</Label>
+                                    <Label htmlFor="sku">SKU {!skuSettings?.autoGenerateSku && '*'}</Label>
                                     <Input
                                         id="sku"
-                                        value={simpleSku}
+                                        value={skuSettings?.autoGenerateSku ? skuSettings.preview : simpleSku}
                                         onChange={(e) => setSimpleSku(e.target.value)}
-                                        placeholder="PROD-001"
-                                        required
+                                        placeholder={skuSettings?.autoGenerateSku ? "Will be auto-generated" : "PROD-001"}
+                                        required={!skuSettings?.autoGenerateSku}
+                                        readOnly={skuSettings?.autoGenerateSku}
+                                        className={skuSettings?.autoGenerateSku ? "bg-muted cursor-not-allowed" : ""}
                                     />
+                                    {skuSettings?.autoGenerateSku && (
+                                        <p className="text-xs text-muted-foreground">✨ Auto-generated</p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="stock">Initial Stock *</Label>

@@ -46,6 +46,26 @@ export function VariantMatrixEditor({
 }: VariantMatrixEditorProps) {
     const [newOptionName, setNewOptionName] = useState('');
     const [newOptionValues, setNewOptionValues] = useState<{ [key: string]: string }>({});
+    const [skuSettings, setSkuSettings] = useState<{ autoGenerateSku: boolean; preview: string } | null>(null);
+
+    // Fetch SKU settings
+    useEffect(() => {
+        async function fetchSkuSettings() {
+            try {
+                const res = await fetch('/api/settings/sku');
+                if (res.ok) {
+                    const data = await res.json();
+                    setSkuSettings({
+                        autoGenerateSku: data.autoGenerateSku,
+                        preview: data.preview
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to fetch SKU settings:', error);
+            }
+        }
+        fetchSkuSettings();
+    }, []);
 
     // Generate variants when options change
     useEffect(() => {
@@ -326,7 +346,7 @@ export function VariantMatrixEditor({
                                     <TableRow>
                                         <TableHead>Variant</TableHead>
                                         <TableHead className="w-[80px]">Image</TableHead>
-                                        <TableHead>SKU *</TableHead>
+                                        <TableHead>SKU {!skuSettings?.autoGenerateSku && '*'}</TableHead>
                                         <TableHead>Price (Rp) *</TableHead>
                                         <TableHead>Cost (Rp)</TableHead>
                                         <TableHead>Stock *</TableHead>
@@ -358,11 +378,16 @@ export function VariantMatrixEditor({
                                             </TableCell>
                                             <TableCell>
                                                 <Input
-                                                    value={variant.sku}
+                                                    value={skuSettings?.autoGenerateSku ? `${skuSettings.preview}-${index + 1}` : variant.sku}
                                                     onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
-                                                    placeholder="SKU"
-                                                    required
+                                                    placeholder={skuSettings?.autoGenerateSku ? "Auto-generated" : "SKU"}
+                                                    required={!skuSettings?.autoGenerateSku}
+                                                    readOnly={skuSettings?.autoGenerateSku}
+                                                    className={skuSettings?.autoGenerateSku ? "bg-muted cursor-not-allowed" : ""}
                                                 />
+                                                {skuSettings?.autoGenerateSku && (
+                                                    <p className="text-xs text-muted-foreground mt-1">✨ Auto-generated</p>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Input

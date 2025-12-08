@@ -8,7 +8,12 @@ import { ReactNode } from "react";
 
 export function Providers({ children }: { children: ReactNode }) {
     return (
-        <ClerkProvider>
+        <ClerkProvider
+            signInFallbackRedirectUrl="/dashboard/analytics"
+            signUpFallbackRedirectUrl="/onboarding"
+            afterSignOutUrl="/sign-in"
+            publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        >
             <LanguageProvider>
                 <SettingsProvider>
                     <PrinterProvider>

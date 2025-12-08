@@ -71,6 +71,7 @@ export function Sidebar() {
                 { label: "Business Profile", href: "/dashboard/settings/business", icon: Store },
                 { label: "Receipt Settings", href: "/dashboard/settings/receipt", icon: FileText },
                 { label: "POS Settings", href: "/dashboard/settings/pos", icon: Settings },
+                { label: "SKU Settings", href: "/dashboard/settings/sku", icon: Settings },
                 { label: "Localization", href: "/dashboard/settings/localization", icon: Globe },
                 { label: t.sidebar.customers, href: "/dashboard/customers", icon: Users },
                 { label: t.sidebar.team, href: "/dashboard/users", icon: UserCog },
@@ -236,8 +237,8 @@ export function Sidebar() {
                         {selectedMenuItem?.children?.map((child, index) => {
                             const isActive = pathname === child.href || pathname.startsWith(child.href + "/");
                             return (
-                                <div 
-                                    key={child.href} 
+                                <div
+                                    key={child.href}
                                     className="relative group transition-all duration-200"
                                     style={{
                                         animationDelay: `${index * 30}ms`
