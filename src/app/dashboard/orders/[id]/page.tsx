@@ -278,7 +278,7 @@ export default function OrderDetailsPage() {
             {/* Hidden Receipt Template */}
             <ReceiptTemplate
                 ref={receiptRef}
-                storeName={tenant?.name || "Nexus POS Store"}
+                storeName={tenant?.name || "Awan POS"}
                 storeAddress={tenant?.address || "123 Tech Street, Jakarta"}
                 storePhone={tenant?.phone || "+62 812 3456 7890"}
                 headerText={tenant?.receiptHeader}

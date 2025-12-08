@@ -5,7 +5,7 @@
 1. Go to [https://dashboard.clerk.com](https://dashboard.clerk.com)
 2. Sign up for a free account
 3. Create a new application
-   - Name it "Nexus POS" or your preferred name
+   - Name it "Awan POS" or your preferred name
    - Select "Next.js" as the framework
 
 ## Step 2: Get Your API Keys

@@ -70,10 +70,6 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                         <span>Order ID:</span>
                         <span>#{orderId.slice(-6).toUpperCase()}</span>
                     </div>
-                    <div className="flex justify-between">
-                        <span>Cashier:</span>
-                        <span>{cashierName}</span>
-                    </div>
                 </div>
 
                 {/* Items */}

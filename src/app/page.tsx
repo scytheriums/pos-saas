@@ -23,10 +23,18 @@ import {
 } from "lucide-react";
 
 export default async function Home() {
-  const { userId } = await auth();
+  const { userId, sessionClaims } = await auth();
 
   if (userId) {
-    redirect("/dashboard/analytics");
+    // Check if user has completed onboarding
+    const metadata = sessionClaims?.metadata as { tenantId?: string } | undefined;
+    const hasCompletedOnboarding = !!metadata?.tenantId;
+
+    if (hasCompletedOnboarding) {
+      redirect("/dashboard/analytics");
+    } else {
+      redirect("/onboarding");
+    }
   }
 
   return (

@@ -1,61 +1,58 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { LanguageProvider } from "@/contexts/LanguageContext";
-import { SettingsProvider } from "@/contexts/SettingsContext";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
-import { PrinterProvider } from "@/contexts/PrinterContext";
+import { Providers } from "./providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Awan POS - Point of Sale System",
-  description: "Modern cloud-based POS system for retail and restaurants",
+  title: "Awan POS",
+  description: "Modern Cloud-Based POS System",
   manifest: "/manifest.json",
-};
-
-export const viewport = {
   themeColor: "#ffffff",
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Awan POS",
+  },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <ClerkProvider
-      signUpFallbackRedirectUrl="/onboarding"
-      signInFallbackRedirectUrl="/dashboard/analytics"
-    >
-      <html lang="en" className="scroll-smooth">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          <LanguageProvider>
-            <SettingsProvider>
-              <PrinterProvider>
-                {children}
-              </PrinterProvider>
-            </SettingsProvider>
-          </LanguageProvider>
-          <div className="print:hidden">
-            <Toaster position="top-right" richColors />
-          </div>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#ffffff" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+      </head>
+      <body className={inter.className}>
+        <Providers>
+          {children}
+        </Providers>
+        <Toaster position="top-center" richColors />
+
+        {/* Service Worker Registration */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                  .then((registration) => {
+                    console.log('SW registered:', registration);
+                  })
+                  .catch((error) => {
+                    console.log('SW registration failed:', error);
+                  });
+              });
+            }
+          `
+        }} />
+      </body>
+    </html>
   );
 }

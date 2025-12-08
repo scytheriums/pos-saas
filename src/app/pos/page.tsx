@@ -456,7 +456,7 @@ export default function POSPage() {
                         <div className="p-2 bg-primary/10 rounded-lg">
                             <Menu className="w-6 h-6 text-primary" />
                         </div>
-                        <h1 className="text-xl font-bold text-gray-800">Nexus POS</h1>
+                        <h1 className="text-xl font-bold text-gray-800">Awan POS</h1>
                         <OfflineIndicator />
                     </div>
                     <div className="flex items-center gap-4">
@@ -747,7 +747,7 @@ export default function POSPage() {
             {lastOrder && (
                 <ReceiptTemplate
                     ref={receiptRef}
-                    storeName={tenant?.name || "Nexus POS Store"}
+                    storeName={tenant?.name || "Awan POS Store"}
                     storeAddress={tenant?.address || "123 Tech Street, Jakarta"}
                     storePhone={tenant?.phone || "+62 812 3456 7890"}
                     headerText={tenant?.receiptHeader}
