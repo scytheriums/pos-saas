@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import { clerkClient } from '@clerk/nextjs/server';
 
 const prisma = new PrismaClient();
 
@@ -22,32 +21,25 @@ async function main() {
         process.exit(1);
     }
 
-    try {
-        const client = await clerkClient();
-        const users = await client.users.getUserList({ emailAddress: [email] });
+    const user = await prisma.user.findUnique({ where: { email } });
 
-        if (users.data.length === 0) {
-            console.error('User not found in Clerk.');
-            process.exit(1);
-        }
-
-        const user = users.data[0];
-        console.log(`Found user: ${user.id}`);
-
-        await client.users.updateUserMetadata(user.id, {
-            publicMetadata: {
-                tenantId: tenant.id,
-                role: 'owner',
-                tenantName: tenant.name
-            }
-        });
-
-        console.log(`Successfully assigned ${email} to tenant ${tenant.name} (${tenant.id})`);
-        console.log('Please refresh your browser to see the changes.');
-    } catch (error) {
-        console.error('Error updating user metadata:', error);
+    if (!user) {
+        console.error('User not found in database.');
         process.exit(1);
     }
+
+    console.log(`Found user: ${user.id}`);
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            tenantId: tenant.id,
+            role: 'owner',
+        },
+    });
+
+    console.log(`Successfully assigned ${email} to tenant ${tenant.name} (${tenant.id})`);
+    console.log('User will see changes on next sign-in.');
 }
 
 main()

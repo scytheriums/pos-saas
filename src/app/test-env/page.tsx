@@ -1,11 +1,12 @@
 export default function TestEnvPage() {
-    const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const authSecret = process.env.BETTER_AUTH_SECRET;
+    const authUrl = process.env.BETTER_AUTH_URL;
 
     return (
         <div className="p-8">
             <h1>Environment Test</h1>
-            <p>Publishable Key: {publishableKey ? '✅ Loaded' : '❌ Missing'}</p>
-            <p>First 20 chars: {publishableKey?.substring(0, 20)}...</p>
+            <p>BETTER_AUTH_SECRET: {authSecret ? '✅ Loaded' : '❌ Missing'}</p>
+            <p>BETTER_AUTH_URL: {authUrl ? `✅ ${authUrl}` : '❌ Missing'}</p>
         </div>
     );
 }

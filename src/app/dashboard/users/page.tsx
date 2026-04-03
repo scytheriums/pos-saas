@@ -1,13 +1,13 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { authClient, type AuthUser } from '@/lib/auth-client';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Mail, Shield, Trash2 } from 'lucide-react';
+import { UserPlus, Mail, Shield, Trash2, Copy, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 type UserRole = 'owner' | 'manager' | 'cashier';
@@ -16,12 +16,12 @@ interface TeamMember {
     id: string;
     email: string;
     role: UserRole;
-    firstName?: string;
-    lastName?: string;
+    name?: string;
 }
 
 export default function UsersPage() {
-    const { user } = useUser();
+    const { data: session, isPending } = authClient.useSession();
+    const user = session?.user as AuthUser | undefined;
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -29,18 +29,19 @@ export default function UsersPage() {
     const [inviteRole, setInviteRole] = useState<UserRole>('cashier');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [inviteLink, setInviteLink] = useState('');
+    const [copied, setCopied] = useState(false);
 
     // Check if user is owner
-    const userRole = user?.publicMetadata?.role as UserRole;
-    const isOwner = userRole === 'owner';
+    const isOwner = user?.role === 'owner';
 
     useEffect(() => {
-        if (!isOwner) {
+        if (!isPending && !isOwner) {
             router.push('/dashboard');
-        } else {
+        } else if (isOwner) {
             fetchTeamMembers();
         }
-    }, [isOwner, router]);
+    }, [isPending, isOwner, router]);
 
     const fetchTeamMembers = async () => {
         try {
@@ -54,11 +55,18 @@ export default function UsersPage() {
         }
     };
 
+    const copyInviteLink = async (link: string) => {
+        await navigator.clipboard.writeText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
         setSuccess('');
+        setInviteLink('');
 
         try {
             const response = await fetch('/api/users/invite', {
@@ -70,15 +78,18 @@ export default function UsersPage() {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to send invitation');
+                throw new Error(data.error || 'Failed to create invitation');
             }
 
-            setSuccess(`Invitation sent to ${inviteEmail}!`);
+            setSuccess(`Invitation created for ${inviteEmail}`);
+            if (data.inviteLink) {
+                setInviteLink(data.inviteLink);
+            }
             setInviteEmail('');
             setInviteRole('cashier');
             fetchTeamMembers();
         } catch (err: any) {
-            setError(err.message || 'Failed to send invitation');
+            setError(err.message || 'Failed to create invitation');
         } finally {
             setLoading(false);
         }
@@ -165,14 +176,30 @@ export default function UsersPage() {
                         )}
 
                         {success && (
-                            <div className="rounded-md bg-green-50 p-3 text-sm text-green-600">
-                                {success}
+                            <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700 space-y-2">
+                                <p>{success}</p>
+                                {inviteLink && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <p className="text-xs font-medium">Share this invite link:</p>
+                                        <div className="flex-1 truncate text-xs bg-white border rounded px-2 py-1 font-mono">
+                                            {inviteLink}
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => copyInviteLink(inviteLink)}
+                                        >
+                                            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         <Button type="submit" disabled={loading}>
                             <Mail className="mr-2 h-4 w-4" />
-                            {loading ? 'Sending...' : 'Send Invitation'}
+                            {loading ? 'Creating...' : 'Create Invite Link'}
                         </Button>
                     </form>
                 </CardContent>
@@ -204,9 +231,7 @@ export default function UsersPage() {
                                         </div>
                                         <div>
                                             <p className="font-medium">
-                                                {member.firstName && member.lastName
-                                                    ? `${member.firstName} ${member.lastName}`
-                                                    : member.email}
+                                                {member.name || member.email}
                                             </p>
                                             <p className="text-sm text-muted-foreground">{member.email}</p>
                                         </div>

@@ -14,7 +14,7 @@ import { Step3TaxLegal } from './steps/Step3TaxLegal';
 import { Step4Localization } from './steps/Step4Localization';
 import { Step5InitialSetup } from './steps/Step5InitialSetup';
 import { useRouter } from 'next/navigation';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { authClient } from '@/lib/auth-client';
 
 const onboardingSchema = z.object({
     // Step 1
@@ -67,8 +67,6 @@ export function OnboardingWizard() {
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const router = useRouter();
-    const { user } = useUser();
-    const { signOut } = useClerk();
 
     const form = useForm<OnboardingFormData>({
         resolver: zodResolver(onboardingSchema) as any,

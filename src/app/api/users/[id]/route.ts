@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, hasRole } from '@/lib/auth';
-import { clerkClient } from '@clerk/nextjs/server';
 import { logAudit } from '@/lib/audit';
+import { prisma } from '@/lib/prisma';
 
 export async function DELETE(
     req: NextRequest,
@@ -28,19 +28,26 @@ export async function DELETE(
             return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 });
         }
 
-        // Get user to verify they're in the same tenant
-        const client = await clerkClient();
-        const userToRemove = await client.users.getUser(userIdToRemove);
+        // Get user from DB to verify they're in the same tenant
+        const userToRemove = await prisma.user.findUnique({
+            where: { id: userIdToRemove },
+        });
 
-        if (userToRemove.publicMetadata.tenantId !== tenantId) {
+        if (!userToRemove) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        if (userToRemove.tenantId !== tenantId) {
             return NextResponse.json({ error: 'User not in your tenant' }, { status: 403 });
         }
 
-        // Remove tenant association (or delete user based on your preference)
-        await client.users.updateUser(userIdToRemove, {
-            publicMetadata: {
+        // Remove tenant association
+        await prisma.user.update({
+            where: { id: userIdToRemove },
+            data: {
                 tenantId: null,
                 role: null,
+                roleId: null,
             },
         });
 
@@ -53,8 +60,8 @@ export async function DELETE(
             resource: "USER",
             resourceId: userIdToRemove,
             details: {
-                removedUserEmail: userToRemove.emailAddresses[0]?.emailAddress,
-                removedUserRole: userToRemove.publicMetadata.role
+                removedUserEmail: userToRemove.email,
+                removedUserRole: userToRemove.role
             },
             request: req
         });

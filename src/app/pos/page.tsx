@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,8 @@ import { useTenantSettings } from "@/contexts/SettingsContext";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
+import { Sidebar } from "@/components/dashboard/Sidebar";
+import { authClient, type AuthUser } from "@/lib/auth-client";
 
 // Sound effect helper
 const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
@@ -58,12 +60,14 @@ const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
     }
 };
 
-type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string };
+type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string; variantName?: string };
 type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: number };
 
 export default function POSPage() {
     const { t, language, setLanguage } = useLanguage();
     const settings = useTenantSettings();
+    const { data: session } = authClient.useSession();
+    const isOwner = (session?.user as AuthUser | undefined)?.role === 'owner';
     const [cart, setCart] = useState<CartItem[]>([]);
     const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
     const [variantModalOpen, setVariantModalOpen] = useState(false);
@@ -82,6 +86,7 @@ export default function POSPage() {
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
     const [tenant, setTenant] = useState<any>(null);
+    const [showMobileCart, setShowMobileCart] = useState(false);
 
     // Pagination state
     const [page, setPage] = useState(1);
@@ -201,7 +206,10 @@ export default function POSPage() {
             name: product.name,
             price: variant ? variant.price : product.price,
             quantity: 1,
-            variantId: variant?.id
+            variantId: variant?.id,
+            variantName: variant?.optionValues?.length
+                ? variant.optionValues.map((ov: any) => ov.value).join(' / ')
+                : undefined,
         };
 
         setCart((prev) => {
@@ -270,7 +278,7 @@ export default function POSPage() {
     };
 
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const taxRate = (tenant?.taxRate || 11) / 100; // Convert percentage to decimal
+    const taxRate = (tenant?.taxRate ?? 0) / 100;
     const tax = total * taxRate;
     const grandTotal = total + tax - discountAmount;
 
@@ -357,7 +365,7 @@ export default function POSPage() {
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price,
-                variantName: item.variantId ? "Variant" : undefined
+                variantName: item.variantName,
             })),
             subtotal: total,
             tax: tax,
@@ -447,95 +455,333 @@ export default function POSPage() {
 
     if (!mounted) return null;
 
-    return (
-        <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
-            <div className="print:hidden h-full flex flex-col">
-                {/* Header */}
-                <header className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0 h-16">
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                            <Menu className="w-6 h-6 text-primary" />
+    // Reusable cart panel content (used in both desktop sidebar and mobile overlay)
+    const cartTaxLabel = taxRate > 0
+        ? `${t.pos.tax} (${Math.round(taxRate * 100)}%)`
+        : t.pos.tax;
+
+    const CartPanelContent = (
+        <>
+            {/* Cart Header */}
+            <div className="p-3 md:p-4 border-b flex items-center justify-between bg-gray-50/50">
+                <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-primary" />
+                    <h2 className="font-bold text-base md:text-lg text-gray-800">{t.pos.currentOrder}</h2>
+                    {cart.length > 0 && (
+                        <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                            {cart.length}
+                        </span>
+                    )}
+                </div>
+                <div className="flex gap-1.5">
+                    {/* Held Carts */}
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50 border-orange-200" title="Held Carts">
+                                <Layers className="w-4 h-4" />
+                                {heldCarts.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{heldCarts.length}</span>
+                                )}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Held Carts</DialogTitle>
+                            </DialogHeader>
+                            <ScrollArea className="h-[300px] pr-4">
+                                {heldCarts.length === 0 ? (
+                                    <div className="text-center text-gray-500 py-8">No held carts</div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {heldCarts.map((held) => (
+                                            <div key={held.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                                <div>
+                                                    <div className="font-medium">{formatTimeWithSettings(held.timestamp, settings)}</div>
+                                                    <div className="text-sm text-gray-500">{held.items.length} items • {formatCurrencyWithSettings(held.total, settings)}</div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Button size="sm" variant="outline" onClick={() => restoreCart(held.id)}>
+                                                        <RotateCcw className="w-4 h-4 mr-1" />
+                                                        Restore
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => deleteHeldCart(held.id)}>
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
+                    <Button variant="outline" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 border-blue-200" onClick={holdCart} disabled={cart.length === 0} title="Hold Cart">
+                        <Save className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setCart([])} disabled={cart.length === 0} title="Clear Cart">
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                </div>
+            </div>
+
+            {/* Cart Items */}
+            <ScrollArea className="flex-1 p-3 md:p-4">
+                {cart.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-3 opacity-50">
+                        <ShoppingCart className="w-14 h-14" />
+                        <p className="font-medium">Cart is empty</p>
+                        <p className="text-xs text-center px-6">Scan a barcode or tap a product to start</p>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {cart.map((item) => (
+                            <div key={(item.variantId || item.id)} className="flex gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm hover:border-primary/20 transition-colors">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start">
+                                        <div className="min-w-0 pr-2">
+                                            <h4 className="font-medium text-gray-800 truncate text-sm">{item.name}</h4>
+                                            {item.variantName && (
+                                                <p className="text-xs text-gray-500 truncate">{item.variantName}</p>
+                                            )}
+                                        </div>
+                                        {/* Always-visible delete on touch */}
+                                        <button
+                                            onClick={() => removeFromCart(item.variantId || item.id)}
+                                            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <div className="font-bold text-primary text-sm">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</div>
+                                        <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                                            <button
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
+                                                onClick={() => updateQuantity(item.variantId || item.id, -1)}
+                                            >
+                                                <Minus className="w-3.5 h-3.5" />
+                                            </button>
+                                            <span className="text-sm font-bold w-6 text-center select-none">{item.quantity}</span>
+                                            <button
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
+                                                onClick={() => updateQuantity(item.variantId || item.id, 1)}
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </ScrollArea>
+
+            {/* Cart Footer */}
+            <div className="p-3 md:p-4 bg-white border-t space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <CustomerSelector
+                    selectedCustomer={selectedCustomer}
+                    onSelectCustomer={setSelectedCustomer}
+                />
+
+                <div className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{t.pos.subtotal}</span>
+                        <span className="font-medium">{formatCurrencyWithSettings(total, settings)}</span>
+                    </div>
+                    {tax > 0 && (
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{cartTaxLabel}</span>
+                            <span className="font-medium">{formatCurrencyWithSettings(tax, settings)}</span>
                         </div>
-                        <h1 className="text-xl font-bold text-gray-800">Awan POS</h1>
+                    )}
+
+                    {/* Discount Section */}
+                    {!appliedDiscount ? (
+                        <div className="flex flex-col gap-1 w-full pt-1">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Discount code (optional)"
+                                    value={discountCode}
+                                    onChange={(e) => {
+                                        setDiscountCode(e.target.value.toUpperCase());
+                                        setDiscountError("");
+                                    }}
+                                    onKeyDown={(e) => e.key === 'Enter' && applyDiscount()}
+                                    className={cn("flex-1 h-9 text-xs", discountError && "border-red-500 focus-visible:ring-red-500")}
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={applyDiscount}
+                                    disabled={!discountCode.trim() || validatingDiscount}
+                                    className="text-xs h-9 px-3"
+                                >
+                                    {validatingDiscount ? "..." : "Apply"}
+                                </Button>
+                            </div>
+                            {discountError && (
+                                <span className="text-[10px] text-red-500 font-medium px-1">{discountError}</span>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex justify-between items-center text-sm rounded-lg bg-green-50 border border-green-100 px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-green-700 font-medium text-xs">🏷 {appliedDiscount.name}</span>
+                                <button
+                                    onClick={removeDiscount}
+                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <span className="font-semibold text-green-700">-{formatCurrencyWithSettings(discountAmount, settings)}</span>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-3 border-t border-dashed">
+                        <span className="text-base font-semibold text-gray-700">{t.pos.total}</span>
+                        <span className="text-2xl font-bold text-primary">{formatCurrencyWithSettings(grandTotal, settings)}</span>
+                    </div>
+                </div>
+
+                <Button
+                    className="w-full h-13 text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl"
+                    size="lg"
+                    disabled={cart.length === 0 || loading}
+                    onClick={handleCheckout}
+                >
+                    {loading ? "Processing..." : t.pos.checkout}
+                </Button>
+            </div>
+        </>
+    );
+
+    return (
+        <div className="h-screen bg-gray-50 flex overflow-hidden">
+            {isOwner && (
+                <div className="print:hidden h-full shrink-0">
+                    <Sidebar />
+                </div>
+            )}
+            <div className="print:hidden h-full flex flex-col flex-1 overflow-hidden min-w-0">
+                {/* ── Header ── */}
+                <header className="bg-white border-b px-3 md:px-6 py-3 flex items-center justify-between shrink-0 h-14 md:h-16">
+                    <div className="flex items-center gap-2 md:gap-4 min-w-0">
+                        <div className="p-1.5 bg-primary/10 rounded-lg shrink-0">
+                            <Menu className="w-5 h-5 text-primary" />
+                        </div>
+                        <h1 className="text-base md:text-xl font-bold text-gray-800 truncate">{tenant?.name || 'Awan POS'}</h1>
                         <OfflineIndicator />
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full text-sm font-medium text-gray-600">
-                            <Clock className="w-4 h-4" />
+                    <div className="flex items-center gap-2">
+                        {/* Clock: hidden on very small screens */}
+                        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+                            <Clock className="w-3.5 h-3.5" />
                             <span>{formatTimeWithSettings(new Date(), settings)}</span>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => setLanguage(language === 'en' ? 'id' : 'en')}>
-                            <Globe className="w-4 h-4" />
-                            <span>{language.toUpperCase()}</span>
-                        </div>
-                        <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold shadow-lg shadow-primary/20">
-                            {tenant?.name?.substring(0, 2).toUpperCase() || "ST"}
+                        {/* Language toggle */}
+                        <button
+                            className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"
+                            onClick={() => setLanguage(language === 'en' ? 'id' : 'en')}
+                        >
+                            <Globe className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{language.toUpperCase()}</span>
+                        </button>
+                        {/* Avatar */}
+                        <div className="w-8 h-8 md:w-9 md:h-9 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold shadow-md shrink-0">
+                            {tenant?.name?.substring(0, 2).toUpperCase() || 'ST'}
                         </div>
                     </div>
                 </header>
 
-                {/* Main Content */}
-                <div className="flex-1 flex overflow-hidden">
+                {/* ── Main ── */}
+                <div className="flex-1 flex overflow-hidden relative">
+
                     {/* Left: Product Grid */}
-                    <div className="flex-1 flex flex-col p-6 gap-6 overflow-hidden">
-                        {/* Search Bar */}
+                    <div className="flex-1 flex flex-col p-3 md:p-5 gap-3 md:gap-4 overflow-hidden min-w-0">
+                        {/* Search */}
                         <div className="relative shrink-0">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
                             <Input
-                                className="pl-12 h-12 text-lg rounded-xl border-gray-200 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all"
+                                className="pl-9 md:pl-12 h-10 md:h-12 text-sm md:text-base rounded-xl border-gray-200 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all"
                                 placeholder={t.pos.searchPlaceholder}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-                                {products.length} products loaded
-                            </div>
+                            {searchQuery && (
+                                <button
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    onClick={() => setSearchQuery('')}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
 
+                        {/* Product count badge */}
+                        {!loading && products.length > 0 && (
+                            <p className="text-xs text-gray-400 -mt-1 pl-1 shrink-0">{products.length} products</p>
+                        )}
+
                         {/* Products Grid */}
-                        <div className="flex-1 -mr-4 pr-4 overflow-y-auto">
+                        <div className="flex-1 overflow-y-auto">
                             {products.length === 0 && loading ? (
-                                <div className="flex items-center justify-center h-64 text-gray-400">
+                                <div className="flex items-center justify-center h-48 text-gray-400">
                                     <div className="flex flex-col items-center gap-3">
-                                        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-                                        <span>Loading products...</span>
+                                        <div className="w-7 h-7 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                                        <span className="text-sm">Loading products...</span>
                                     </div>
                                 </div>
                             ) : products.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-2">
-                                    <PackageOpen className="w-12 h-12 opacity-50" />
-                                    <span>No products found</span>
+                                <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-2">
+                                    <PackageOpen className="w-10 h-10 opacity-40" />
+                                    <span className="text-sm">No products found</span>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-6">
-                                    {products.map((product) => (
-                                        <Card
-                                            key={product.id}
-                                            className="cursor-pointer hover:shadow-lg transition-all duration-200 border-gray-100 group overflow-hidden"
-                                            onClick={() => handleProductClick(product)}
-                                        >
-                                            <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                                                {/* Placeholder for product image */}
-                                                <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gray-50 group-hover:scale-105 transition-transform duration-300">
-                                                    <PackageOpen className="w-12 h-12" />
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 md:gap-3 pb-24 lg:pb-4">
+                                    {products.map((product) => {
+                                        const imgUrl = product.imageUrl || product.variants?.[0]?.imageUrl;
+                                        return (
+                                            <Card
+                                                key={product.id}
+                                                className="cursor-pointer hover:shadow-md active:scale-[0.97] transition-all duration-150 border-gray-100 group overflow-hidden select-none"
+                                                onClick={() => handleProductClick(product)}
+                                            >
+                                                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                                                    {imgUrl ? (
+                                                        <img
+                                                            src={imgUrl}
+                                                            alt={product.name}
+                                                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        />
+                                                    ) : (
+                                                        <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gray-50 group-hover:bg-gray-100 transition-colors">
+                                                            <PackageOpen className="w-10 h-10" />
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute bottom-0 inset-x-0 bg-linear-to-t from-black/50 to-transparent px-2 py-1.5">
+                                                        <span className="text-xs font-bold text-white drop-shadow">
+                                                            {formatCurrencyWithSettings(product.price || product.variants?.[0]?.price || 0, settings)}
+                                                        </span>
+                                                    </div>
+                                                    {product.variants?.length > 0 && (
+                                                        <div className="absolute top-1.5 left-1.5 bg-primary/80 text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                                                            {product.variants.length}v
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold text-primary shadow-sm">
-                                                    {formatCurrencyWithSettings(product.price || product.variants?.[0]?.price || 0, settings)}
-                                                </div>
-                                            </div>
-                                            <CardContent className="p-3">
-                                                <h3 className="font-semibold text-gray-800 truncate" title={product.name}>{product.name}</h3>
-                                                <p className="text-xs text-gray-500 mt-1 truncate">
-                                                    {product.variants?.length ? `${product.variants.length} variants` : 'Single item'}
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                                <CardContent className="p-2 md:p-3">
+                                                    <h3 className="font-semibold text-gray-800 truncate text-xs md:text-sm" title={product.name}>{product.name}</h3>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
 
-                                    {/* Sentinel for Infinite Scroll */}
-                                    <div ref={observerTarget} className="col-span-full h-10 flex items-center justify-center">
+                                    {/* Infinite scroll sentinel */}
+                                    <div ref={observerTarget} className="col-span-full h-8 flex items-center justify-center">
                                         {loading && page > 1 && (
-                                            <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                                            <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                                         )}
                                     </div>
                                 </div>
@@ -543,186 +789,53 @@ export default function POSPage() {
                         </div>
                     </div>
 
-                    {/* Right: Cart Panel */}
-                    <div className="w-[400px] bg-white border-l shadow-xl flex flex-col shrink-0 z-10">
-                        <div className="p-4 border-b flex items-center justify-between bg-gray-50/50">
-                            <div className="flex items-center gap-2">
-                                <ShoppingCart className="w-5 h-5 text-primary" />
-                                <h2 className="font-bold text-lg text-gray-800">{t.pos.currentOrder}</h2>
-                                <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">
+                    {/* ── Desktop Cart Panel (lg+) ── */}
+                    <div className="hidden lg:flex w-[380px] bg-white border-l shadow-xl flex-col shrink-0 z-10">
+                        {CartPanelContent}
+                    </div>
+
+                    {/* ── Mobile Cart FAB (< lg) ── */}
+                    {!showMobileCart && (
+                        <button
+                            className="lg:hidden fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-primary text-primary-foreground px-4 py-3 rounded-full shadow-2xl shadow-primary/30 font-semibold text-sm active:scale-95 transition-transform"
+                            onClick={() => setShowMobileCart(true)}
+                        >
+                            <ShoppingCart className="w-5 h-5" />
+                            {cart.length > 0 && (
+                                <span className="bg-white text-primary text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center">
                                     {cart.length}
                                 </span>
-                            </div>
-                            <div className="flex gap-2">
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="icon" className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50 border-orange-200" title="Held Carts">
-                                            <Clock className="w-4 h-4" />
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-md">
-                                        <DialogHeader>
-                                            <DialogTitle>Held Carts</DialogTitle>
-                                        </DialogHeader>
-                                        <ScrollArea className="h-[300px] pr-4">
-                                            {heldCarts.length === 0 ? (
-                                                <div className="text-center text-gray-500 py-8">No held carts</div>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    {heldCarts.map((held) => (
-                                                        <div key={held.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                                            <div>
-                                                                <div className="font-medium">{formatTimeWithSettings(held.timestamp, settings)}</div>
-                                                                <div className="text-sm text-gray-500">{held.items.length} items • {formatCurrencyWithSettings(held.total, settings)}</div>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <Button size="sm" variant="outline" onClick={() => restoreCart(held.id)}>
-                                                                    <RotateCcw className="w-4 h-4 mr-1" />
-                                                                    Restore
-                                                                </Button>
-                                                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => deleteHeldCart(held.id)}>
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </ScrollArea>
-                                    </DialogContent>
-                                </Dialog>
-                                <Button variant="outline" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 border-blue-200" onClick={holdCart} disabled={cart.length === 0} title="Hold Cart">
-                                    <Save className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setCart([])} disabled={cart.length === 0} title="Clear Cart">
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-
-                        <ScrollArea className="flex-1 p-4">
-                            {cart.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3 opacity-50">
-                                    <ShoppingCart className="w-16 h-16" />
-                                    <p className="font-medium">Cart is empty</p>
-                                    <p className="text-sm text-center px-8">Scan a barcode or select products from the grid to start</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {cart.map((item) => (
-                                        <div key={(item.variantId || item.id)} className="flex gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm group hover:border-primary/20 transition-colors">
-                                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                                                <PackageOpen className="w-6 h-6 text-gray-400" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <h4 className="font-medium text-gray-800 truncate pr-2">{item.name}</h4>
-                                                    <button onClick={() => removeFromCart(item.variantId || item.id)} className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                                <div className="flex items-center justify-between mt-2">
-                                                    <div className="font-bold text-primary">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</div>
-                                                    <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1">
-                                                        <button
-                                                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white hover:shadow-sm transition-all text-gray-600"
-                                                            onClick={() => updateQuantity(item.variantId || item.id, -1)}
-                                                        >
-                                                            <Minus className="w-3 h-3" />
-                                                        </button>
-                                                        <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                                                        <button
-                                                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white hover:shadow-sm transition-all text-gray-600"
-                                                            onClick={() => updateQuantity(item.variantId || item.id, 1)}
-                                                        >
-                                                            <Plus className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
                             )}
-                        </ScrollArea>
+                            <span>{formatCurrencyWithSettings(grandTotal, settings)}</span>
+                        </button>
+                    )}
 
-                        <div className="p-4 bg-white border-t space-y-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
-                            {/* Customer Selector */}
-                            <CustomerSelector
-                                selectedCustomer={selectedCustomer}
-                                onSelectCustomer={setSelectedCustomer}
+                    {/* ── Mobile Cart Overlay (< lg) ── */}
+                    {showMobileCart && (
+                        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+                            {/* Backdrop */}
+                            <div
+                                className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                                onClick={() => setShowMobileCart(false)}
                             />
-
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">{t.pos.subtotal}</span>
-                                    <span className="font-medium">{formatCurrencyWithSettings(total, settings)}</span>
+                            {/* Drawer */}
+                            <div className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[90dvh] min-h-[60dvh]">
+                                {/* Drag handle + close */}
+                                <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0">
+                                    <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+                                    <button
+                                        className="ml-auto p-1 rounded-full text-gray-500 hover:bg-gray-100"
+                                        onClick={() => setShowMobileCart(false)}
+                                    >
+                                        <ChevronDown className="w-5 h-5" />
+                                    </button>
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">{t.pos.tax} (11%)</span>
-                                    <span className="font-medium">{formatCurrencyWithSettings(tax, settings)}</span>
-                                </div>
-
-                                {/* Discount Section */}
-                                {!appliedDiscount ? (
-                                    <div className="flex flex-col gap-1 w-full">
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="Discount code (optional)"
-                                                value={discountCode}
-                                                onChange={(e) => {
-                                                    setDiscountCode(e.target.value.toUpperCase());
-                                                    setDiscountError("");
-                                                }}
-                                                onKeyDown={(e) => e.key === 'Enter' && applyDiscount()}
-                                                className={cn("flex-1 text-xs", discountError && "border-red-500 focus-visible:ring-red-500")}
-                                            />
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={applyDiscount}
-                                                disabled={!discountCode.trim() || validatingDiscount}
-                                                className="text-xs"
-                                            >
-                                                {validatingDiscount ? "..." : "Apply"}
-                                            </Button>
-                                        </div>
-                                        {discountError && (
-                                            <span className="text-[10px] text-red-500 font-medium px-1">{discountError}</span>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex justify-between items-center text-sm bg-green-50 -mx-4 px-4 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-green-700 font-medium">Discount: {appliedDiscount.name}</span>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={removeDiscount}
-                                                className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
-                                            >
-                                                Remove
-                                            </Button>
-                                        </div>
-                                        <span className="font-medium text-green-700">-{formatCurrencyWithSettings(discountAmount, settings)}</span>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-between items-end pt-4 border-t border-dashed">
-                                    <span className="text-lg font-medium">{t.pos.total}</span>
-                                    <span className="text-3xl font-bold text-primary">{formatCurrencyWithSettings(grandTotal, settings)}</span>
+                                <div className="flex-1 flex flex-col overflow-hidden">
+                                    {CartPanelContent}
                                 </div>
                             </div>
-                            <Button
-                                className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl"
-                                size="lg"
-                                disabled={cart.length === 0 || loading}
-                                onClick={handleCheckout}
-                            >
-                                {loading ? "Processing..." : t.pos.checkout}
-                            </Button>
                         </div>
-                    </div>
+                    )}
 
                     {selectedProduct && (
                         <VariantSelector
@@ -753,6 +866,7 @@ export default function POSPage() {
                     headerText={tenant?.receiptHeader}
                     footerText={tenant?.receiptFooter}
                     showLogo={tenant?.showLogo !== false}
+                    logoUrl={tenant?.logoUrl}
                     {...lastOrder}
                 />
             )}

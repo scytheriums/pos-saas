@@ -104,8 +104,8 @@ export default function ReceiptSettingsPage() {
 
     // Mock data for preview
     const previewItems = [
-        { name: "Sample Product A", quantity: 2, price: 50000, variantName: "Size M" },
-        { name: "Sample Product B", quantity: 1, price: 75000, variantName: "Red" },
+        { name: "Sample Product A", quantity: 2, price: 50000, variantName: "Size M / Black" },
+        { name: "Sample Product B", quantity: 1, price: 75000 },
     ];
 
     return (

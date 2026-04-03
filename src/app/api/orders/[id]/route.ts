@@ -29,6 +29,11 @@ export async function GET(
                                     select: {
                                         name: true
                                     }
+                                },
+                                optionValues: {
+                                    select: {
+                                        value: true
+                                    }
                                 }
                             }
                         }

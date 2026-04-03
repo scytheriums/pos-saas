@@ -13,7 +13,7 @@ export async function hasPermission(
         const user = await prisma.user.findUnique({
             where: { id: userId },
             include: {
-                role: {
+                userRole: {
                     include: {
                         permissions: true
                     }
@@ -21,17 +21,17 @@ export async function hasPermission(
             }
         });
 
-        if (!user || !user.role) {
+        if (!user || !user.userRole) {
             return false;
         }
 
         // Check if user's role has the specific permission
-        const hasSpecificPermission = user.role.permissions.some(
+        const hasSpecificPermission = user.userRole.permissions.some(
             p => p.action === action && p.resource === resource
         );
 
         // Check if user's role has MANAGE permission for the resource (grants all actions)
-        const hasManagePermission = user.role.permissions.some(
+        const hasManagePermission = user.userRole.permissions.some(
             p => p.action === 'MANAGE' && p.resource === resource
         );
 
@@ -49,7 +49,7 @@ export async function getUserPermissions(userId: string) {
     const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-            role: {
+            userRole: {
                 include: {
                     permissions: true
                 }
@@ -57,7 +57,7 @@ export async function getUserPermissions(userId: string) {
         }
     });
 
-    return user?.role?.permissions || [];
+    return user?.userRole?.permissions || [];
 }
 
 /**

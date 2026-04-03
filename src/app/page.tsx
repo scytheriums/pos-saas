@@ -1,4 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/better-auth";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -23,14 +24,11 @@ import {
 } from "lucide-react";
 
 export default async function Home() {
-  const { userId, sessionClaims } = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
-  if (userId) {
-    // Check if user has completed onboarding
-    const metadata = sessionClaims?.metadata as { tenantId?: string } | undefined;
-    const hasCompletedOnboarding = !!metadata?.tenantId;
-
-    if (hasCompletedOnboarding) {
+  if (session?.user) {
+    const user = session.user as { tenantId?: string | null };
+    if (user.tenantId) {
       redirect("/dashboard/analytics");
     } else {
       redirect("/onboarding");

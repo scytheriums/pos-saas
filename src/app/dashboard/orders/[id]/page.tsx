@@ -41,6 +41,7 @@ interface OrderDetails {
             product: {
                 name: string;
             };
+            optionValues: { value: string }[];
         };
     }[];
 }
@@ -145,12 +146,12 @@ export default function OrderDetailsPage() {
 
     // Calculate subtotal and tax for receipt
     const subtotal = order.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
-    const taxRate = (tenant?.taxRate || 11) / 100; // Convert percentage to decimal
+    const taxRate = (tenant?.taxRate ?? 0) / 100;
     const tax = subtotal * taxRate;
 
     return (
-        <div className="p-6 space-y-6">
-            <div className="print:hidden space-y-6">
+        <>
+            <div className="print:hidden p-6 space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -292,7 +293,9 @@ export default function OrderDetailsPage() {
                     name: item.variant.product.name,
                     quantity: item.quantity,
                     price: Number(item.price),
-                    variantName: item.variant.sku
+                    variantName: item.variant.optionValues.length > 0
+                        ? item.variant.optionValues.map(ov => ov.value).join(' / ')
+                        : undefined,
                 }))}
                 subtotal={subtotal}
                 tax={tax}
@@ -300,6 +303,6 @@ export default function OrderDetailsPage() {
                 discountAmount={Number(order.discountAmount || 0)}
                 discountName={order.discount?.name}
             />
-        </div>
+        </>
     );
 }

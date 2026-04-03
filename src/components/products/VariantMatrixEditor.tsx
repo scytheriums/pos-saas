@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,11 @@ export function VariantMatrixEditor({
     const [newOptionValues, setNewOptionValues] = useState<{ [key: string]: string }>({});
     const [skuSettings, setSkuSettings] = useState<{ autoGenerateSku: boolean; preview: string } | null>(null);
 
+    // Keep a ref to variants so the options effect always reads the latest data
+    // without needing variants in its dependency array (which would cause infinite loops)
+    const variantsRef = useRef(variants);
+    variantsRef.current = variants;
+
     // Fetch SKU settings
     useEffect(() => {
         async function fetchSkuSettings() {
@@ -67,14 +72,14 @@ export function VariantMatrixEditor({
         fetchSkuSettings();
     }, []);
 
-    // Generate variants when options change
+    // Generate variants when options change, preserving any edits already made
     useEffect(() => {
         if (options.length > 0 && options.every(opt => opt.values.length > 0)) {
             const newVariants = generateVariantCombinations(options);
 
             // Preserve existing variant data if the combination exists
             const updatedVariants = newVariants.map(newVar => {
-                const existing = variants.find(v =>
+                const existing = variantsRef.current.find(v =>
                     v.optionValueIds.length === newVar.optionValueIds.length &&
                     v.optionValueIds.every(id => newVar.optionValueIds.includes(id))
                 );
@@ -85,6 +90,7 @@ export function VariantMatrixEditor({
         } else {
             onVariantsChange([]);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [options]);
 
     const generateVariantCombinations = (opts: Option[]): Variant[] => {

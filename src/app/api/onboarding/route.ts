@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@/lib/better-auth';
 import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
+import { createDefaultRoles } from '@/lib/permissions';
 
 export async function POST(req: NextRequest) {
     try {
-        const session = await auth();
+        const session = await auth.api.getSession({ headers: await headers() });
 
-        if (!session.userId) {
+        if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const userId = session.user.id;
         const data = await req.json();
 
-        // Get user from Clerk
-        const client = await clerkClient();
-        const user = await client.users.getUser(session.userId);
-
         // Check if user already has a tenant
-        if (user.publicMetadata.tenantId) {
+        const existingUser = await prisma.user.findUnique({ where: { id: userId } });
+        if (existingUser?.tenantId) {
             return NextResponse.json({ error: 'User already has a tenant' }, { status: 400 });
         }
 
@@ -95,28 +94,22 @@ export async function POST(req: NextRequest) {
         });
 
         // TODO: Handle team member invitation (data.teamMemberEmail)
-        // This would require sending an email invitation
 
-        // Update user metadata in Clerk (outside transaction as it's external service)
-        try {
-            console.log('Updating Clerk metadata for user:', session.userId);
-            console.log('Tenant ID:', result.id);
-            console.log('Tenant Name:', result.name);
+        // Create default RBAC roles for the new tenant
+        await createDefaultRoles(result.id);
+        const ownerRole = await prisma.userRole.findFirst({
+            where: { tenantId: result.id, isDefault: true },
+        });
 
-            const updateResult = await client.users.updateUserMetadata(session.userId, {
-                publicMetadata: {
-                    tenantId: result.id,
-                    tenantName: result.name,
-                    role: 'owner',
-                },
-            });
-
-            console.log('Clerk metadata update successful:', updateResult.publicMetadata);
-        } catch (clerkError) {
-            console.error('Failed to update Clerk metadata:', clerkError);
-            // Don't fail the whole onboarding if Clerk update fails
-            // The tenant is created, user can manually fix metadata
-        }
+        // Update user in DB with tenantId and role (replaces Clerk metadata)
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                tenantId: result.id,
+                role: 'owner',
+                roleId: ownerRole?.id ?? null,
+            },
+        });
 
         return NextResponse.json({
             success: true,

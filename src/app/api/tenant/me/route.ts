@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
                 taxRate: true,
                 receiptHeader: true,
                 receiptFooter: true,
-                showLogo: true
+                showLogo: true,
+                logoUrl: true
             }
         });
 

@@ -1,7 +1,6 @@
 import React, { forwardRef } from 'react';
-import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
+import { formatDateTimeWithSettings } from '@/lib/format';
 import { useTenantSettings } from '@/contexts/SettingsContext';
-import Image from 'next/image';
 
 interface ReceiptItem {
     name: string;
@@ -33,28 +32,32 @@ interface ReceiptProps {
 export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
     ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, headerText, footerText, showLogo, logoUrl, isPreview }, ref) => {
         const settings = useTenantSettings();
+        const fmt = (n: number) =>
+            new Intl.NumberFormat(settings.currency === 'IDR' ? 'id-ID' : 'en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            }).format(n);
         return (
-            <div ref={ref} className={isPreview ? "w-full p-4 font-mono text-xs leading-tight text-black bg-white" : "hidden print:block print:w-full print:p-1 print:font-mono print:text-[10px] print:leading-tight text-black bg-white"}>
+            <div ref={ref} className={isPreview ? "w-[220px] p-1 font-mono text-[10px] leading-tight text-black bg-white" : "hidden print:block print:w-full print:p-1 print:font-mono print:text-[10px] print:leading-tight text-black bg-white"}>
                 <style type="text/css" media="print">
                     {`
                         @page { size: 58mm auto; margin: 0mm; }
                         body { margin: 0; padding: 0; }
+                        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+                        img { display: block !important; visibility: visible !important; }
                     `}
                 </style>
                 {/* Header */}
                 <div className="text-center mb-4 border-b border-black pb-2 border-dashed">
                     {showLogo && logoUrl && (
-                        <div className="mb-2 flex justify-center relative h-12">
-                            <Image
-                                src={logoUrl}
-                                alt="Business Logo"
-                                width={120}
-                                height={48}
-                                className="object-contain"
-                            />
-                        </div>
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={logoUrl}
+                            alt="Business Logo"
+                            className="mx-auto mb-2 h-12 object-contain"
+                        />
                     )}
-                    <h1 className="font-bold text-lg mb-1">{storeName}</h1>
+                    <h1 className="font-bold text-sm mb-1">{storeName}</h1>
                     {storeAddress && <p>{storeAddress}</p>}
                     {storePhone && <p>{storePhone}</p>}
                     {headerText && <p className="mt-2 whitespace-pre-wrap">{headerText}</p>}
@@ -87,10 +90,10 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                                 <tr key={index}>
                                     <td className="py-1 pr-1">
                                         <div className="font-bold">{item.name}</div>
-                                        {item.variantName && <div className="text-[8px] text-gray-600">{item.variantName}</div>}
+                                        {item.variantName && <div className="text-[9px] font-medium">{item.variantName}</div>}
                                     </td>
                                     <td className="py-1 text-right align-top">{item.quantity}</td>
-                                    <td className="py-1 text-right align-top">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</td>
+                                    <td className="py-1 text-right align-top">{fmt(item.price * item.quantity)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -101,23 +104,23 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                 <div className="flex flex-col gap-1 border-b border-black border-dashed mb-4 pb-2">
                     <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
+                        <span>{fmt(subtotal)}</span>
                     </div>
                     {tax > 0 && (
                         <div className="flex justify-between">
                             <span>Tax ({settings.taxRate}%)</span>
-                            <span>{formatCurrencyWithSettings(tax, settings)}</span>
+                            <span>{fmt(tax)}</span>
                         </div>
                     )}
-                    {discountAmount && discountAmount > 0 && (
-                        <div className="flex justify-between text-green-700">
+                    {(discountAmount ?? 0) > 0 && (
+                        <div className="flex justify-between font-medium">
                             <span>Discount{discountName ? ` (${discountName})` : ''}</span>
-                            <span>-{formatCurrencyWithSettings(discountAmount, settings)}</span>
+                            <span>-{fmt(discountAmount!)}</span>
                         </div>
                     )}
                     <div className="flex justify-between font-bold text-sm mt-1">
                         <span>Total</span>
-                        <span>{formatCurrencyWithSettings(total, settings)}</span>
+                        <span>{fmt(total)}</span>
                     </div>
                 </div>
 

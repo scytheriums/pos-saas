@@ -26,7 +26,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useState, useEffect } from "react";
-import { useClerk } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 type MenuItem = {
     icon: any;
@@ -38,7 +39,7 @@ type MenuItem = {
 export function Sidebar() {
     const pathname = usePathname();
     const { t } = useLanguage();
-    const { signOut } = useClerk();
+    const router = useRouter();
     const [selectedModule, setSelectedModule] = useState<string | null>(null);
     const [isSecondaryCollapsed, setIsSecondaryCollapsed] = useState(false);
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -144,7 +145,9 @@ export function Sidebar() {
                 <div className="relative group mt-auto">
                     <button
                         onClick={() => {
-                            signOut({ redirectUrl: '/sign-in' });
+                            authClient.signOut({
+                                fetchOptions: { onSuccess: () => router.push('/sign-in') },
+                            });
                         }}
                         className="w-10 h-10 rounded-md flex items-center justify-center transition-colors text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                     >

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
                 roleId: ownerRole.id
             },
             include: {
-                role: true
+                userRole: true
             }
         });
 

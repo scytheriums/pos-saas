@@ -43,17 +43,13 @@ async function main() {
     // 3. Create Admin User
     const adminEmail = 'admin@example.com';
 
-
-    // Actually, upsert requires a unique constraint.
-    // User model: clerkUserId is unique.
-
     const adminUser = await prisma.user.upsert({
-        where: { clerkUserId: 'user_admin_mock' },
+        where: { email: adminEmail },
         update: {},
         create: {
             email: adminEmail,
             name: 'Admin User',
-            clerkUserId: 'user_admin_mock',
+            emailVerified: true,
             roleId: adminRole.id,
             tenantId: tenant.id,
         },

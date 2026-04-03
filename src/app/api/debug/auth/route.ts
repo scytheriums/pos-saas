@@ -1,46 +1,42 @@
-import { auth } from '@clerk/nextjs/server';
-import { clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@/lib/better-auth';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
     try {
-        const session = await auth();
+        const session = await auth.api.getSession({ headers: await headers() });
 
-        if (!session.userId) {
+        if (!session) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
-        const client = await clerkClient();
-        const clerkUser = await client.users.getUser(session.userId);
-
         const dbUser = await prisma.user.findUnique({
-            where: { clerkUserId: session.userId },
+            where: { id: session.user.id },
             include: {
                 tenant: true,
-                role: true
-            }
+                userRole: true,
+            },
         });
 
         return NextResponse.json({
-            clerk: {
-                userId: session.userId,
-                email: clerkUser.emailAddresses[0]?.emailAddress,
-                metadata: clerkUser.publicMetadata,
-                sessionClaims: session.sessionClaims
+            session: {
+                userId: session.user.id,
+                email: session.user.email,
+                tenantId: session.user.tenantId,
+                role: session.user.role,
             },
             database: dbUser,
             match: {
                 userExists: !!dbUser,
-                tenantIdMatch: dbUser?.tenantId === clerkUser.publicMetadata.tenantId,
-                hasRole: !!dbUser?.role
-            }
+                tenantIdMatch: dbUser?.tenantId === session.user.tenantId,
+                hasRole: !!dbUser?.userRole,
+            },
         });
     } catch (error: any) {
         return NextResponse.json({
             error: 'Debug failed',
             message: error.message,
-            stack: error.stack
         }, { status: 500 });
     }
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, hasRole } from '@/lib/auth';
-import { clerkClient } from '@clerk/nextjs/server';
 import { logAudit } from '@/lib/audit';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
     try {
@@ -28,16 +28,19 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
         }
 
-        // Create invitation using Clerk
-        const client = await clerkClient();
-        const invitation = await client.invitations.createInvitation({
-            emailAddress: email,
-            publicMetadata: {
+        // Create invitation record in DB
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const invitation = await prisma.invitation.create({
+            data: {
+                email,
                 tenantId,
                 role: inviteRole,
+                expiresAt,
             },
-            redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
         });
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const inviteLink = `${appUrl}/sign-up?invite=${invitation.token}`;
 
         // Log audit trail
         await logAudit({
@@ -56,8 +59,9 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({
-            message: 'Invitation sent successfully',
+            message: 'Invitation created successfully',
             invitationId: invitation.id,
+            inviteLink,
         });
     } catch (error: any) {
         console.error('Error creating invitation:', error);

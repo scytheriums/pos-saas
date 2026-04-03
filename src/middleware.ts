@@ -1,41 +1,44 @@
-﻿import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 
-// Simple route matchers
-const isPublicRoute = createRouteMatcher([
-    '/sign-in(.*)',
-    '/sign-up(.*)',
-    '/api/webhooks/clerk',
-    '/api/debug(.*)',
+// Cookie set by Better Auth on every authenticated session
+const SESSION_COOKIE = "better-auth.session_token";
+
+const PUBLIC_PATHS = [
+    '/sign-in',
+    '/sign-up',
+    '/api/auth',
+    '/api/debug',
     '/',
     '/privacy',
-]);
+];
 
-// Simpler middleware - only handle auth, let page components handle redirects
-export default clerkMiddleware(async (auth, req) => {
-    const { userId } = await auth();
+function isPublicPath(pathname: string): boolean {
+    return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?'));
+}
 
-    // Always allow public routes
-    if (isPublicRoute(req)) {
+export async function middleware(req: NextRequest) {
+    const { pathname } = req.nextUrl;
+
+    if (isPublicPath(pathname)) {
         return NextResponse.next();
     }
 
-    // If not authenticated and trying to access protected route
-    if (!userId) {
-        // For API routes, return 401
-        if (req.nextUrl.pathname.startsWith('/api/')) {
+    // Check for session cookie (lightweight edge-compatible check)
+    const sessionCookie =
+        req.cookies.get(SESSION_COOKIE) ||
+        req.cookies.get(`__Secure-${SESSION_COOKIE}`);
+
+    if (!sessionCookie?.value) {
+        if (pathname.startsWith('/api/')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        // For pages, redirect to sign-in
         const signInUrl = new URL('/sign-in', req.url);
-        signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
+        signInUrl.searchParams.set('redirect_url', pathname);
         return NextResponse.redirect(signInUrl);
     }
 
-    // Authenticated - let the request through
-    // Page components will handle onboarding redirects
     return NextResponse.next();
-});
+}
 
 export const config = {
     matcher: [
