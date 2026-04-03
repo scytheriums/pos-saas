@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
     '/api/debug',
     '/',
     '/privacy',
+    '/test-env'
 ];
 
 function isPublicPath(pathname: string): boolean {
