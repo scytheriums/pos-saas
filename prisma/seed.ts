@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import { auth } from '../src/lib/better-auth';
 
 const prisma = new PrismaClient({});
+
+const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_PASSWORD = 'Admin123!';
 
 async function main() {
     // 1. Create Default Tenant
@@ -40,22 +44,47 @@ async function main() {
 
     console.log('Created Roles:', adminRole.name, cashierRole.name);
 
-    // 3. Create Admin User
-    const adminEmail = 'admin@example.com';
+    // 3. Create Admin User via Better Auth (handles password hashing + Account record)
+    const existingUser = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
 
-    const adminUser = await prisma.user.upsert({
-        where: { email: adminEmail },
-        update: {},
-        create: {
-            email: adminEmail,
-            name: 'Admin User',
-            emailVerified: true,
-            roleId: adminRole.id,
-            tenantId: tenant.id,
-        },
-    });
+    if (!existingUser) {
+        const result = await auth.api.signUpEmail({
+            body: {
+                email: ADMIN_EMAIL,
+                password: ADMIN_PASSWORD,
+                name: 'Admin User',
+            },
+        });
 
-    console.log('Created Admin User:', adminUser.email);
+        if (!result?.user) {
+            throw new Error('Failed to create admin user via Better Auth');
+        }
+
+        // Assign tenant + owner role
+        await prisma.user.update({
+            where: { email: ADMIN_EMAIL },
+            data: {
+                tenantId: tenant.id,
+                roleId: adminRole.id,
+                role: 'owner',
+                emailVerified: true,
+            },
+        });
+
+        console.log(`Created Admin User: ${ADMIN_EMAIL} / password: ${ADMIN_PASSWORD}`);
+    } else {
+        // Make sure existing user has correct tenant + role
+        await prisma.user.update({
+            where: { email: ADMIN_EMAIL },
+            data: {
+                tenantId: tenant.id,
+                roleId: adminRole.id,
+                role: 'owner',
+                emailVerified: true,
+            },
+        });
+        console.log(`Admin user already exists: ${ADMIN_EMAIL} (tenant + role updated)`);
+    }
 }
 
 main()
