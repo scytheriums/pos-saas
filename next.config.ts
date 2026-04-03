@@ -14,7 +14,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+    ],
   },
   // Add empty turbopack config to silence the warning
   // Most apps work fine with default Turbopack settings
