@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, X, Bluetooth, BluetoothOff, Loader2 } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, X, Bluetooth, BluetoothOff, Loader2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -67,7 +67,23 @@ type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: numbe
 export default function POSPage() {
     const { t, language, setLanguage } = useLanguage();
     const settings = useTenantSettings();
+
+    // Capture PWA install prompt (may have fired before this component mounted)
+    useEffect(() => {
+        const sync = () => {
+            if ((window as any).__pwaPrompt) setPwaPrompt((window as any).__pwaPrompt);
+        };
+        sync(); // already captured?
+        window.addEventListener('pwaPromptReady', sync);
+        window.addEventListener('beforeinstallprompt', (e: Event) => {
+            e.preventDefault();
+            (window as any).__pwaPrompt = e;
+            setPwaPrompt(e);
+        });
+        return () => window.removeEventListener('pwaPromptReady', sync);
+    }, []);
     const { isConnected: btConnected, isConnecting: btConnecting, deviceName: btDeviceName, connect: btConnect, disconnect: btDisconnect, printReceipt } = usePrinter();
+    const [pwaPrompt, setPwaPrompt] = useState<any>(null);
     const { data: session } = authClient.useSession();
     const isOwner = (session?.user as AuthUser | undefined)?.role === 'owner';
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -740,6 +756,24 @@ export default function POSPage() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                             )}
                         </button>
+                        {/* PWA Install button — only shows when browser deems app installable */}
+                        {pwaPrompt && (
+                            <button
+                                className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold hover:bg-purple-100 transition-colors"
+                                title="Install App"
+                                onClick={async () => {
+                                    pwaPrompt.prompt();
+                                    const { outcome } = await pwaPrompt.userChoice;
+                                    if (outcome === 'accepted') {
+                                        setPwaPrompt(null);
+                                        (window as any).__pwaPrompt = null;
+                                    }
+                                }}
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Install</span>
+                            </button>
+                        )}
                         {/* Language toggle */}
                         <button
                             className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"

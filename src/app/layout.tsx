@@ -39,16 +39,24 @@ export default function RootLayout({
         </Providers>
         <Toaster position="top-center" richColors />
 
-        {/* Service Worker Registration */}
+        {/* Service Worker + PWA install prompt capture */}
         <script dangerouslySetInnerHTML={{
           __html: `
+            // Capture install prompt as early as possible, before React hydration
+            window.__pwaPrompt = null;
+            window.addEventListener('beforeinstallprompt', function(e) {
+              e.preventDefault();
+              window.__pwaPrompt = e;
+              // Notify any already-mounted React component
+              window.dispatchEvent(new Event('pwaPromptReady'));
+            });
             if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
+              window.addEventListener('load', function() {
                 navigator.serviceWorker.register('/sw.js')
-                  .then((registration) => {
-                    console.log('SW registered:', registration);
+                  .then(function(registration) {
+                    console.log('SW registered:', registration.scope);
                   })
-                  .catch((error) => {
+                  .catch(function(error) {
                     console.log('SW registration failed:', error);
                   });
               });
