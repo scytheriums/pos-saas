@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, X } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, X, Bluetooth, BluetoothOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { authClient, type AuthUser } from "@/lib/auth-client";
+import { usePrinter } from "@/contexts/PrinterContext";
 
 // Sound effect helper
 const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
@@ -66,6 +67,7 @@ type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: numbe
 export default function POSPage() {
     const { t, language, setLanguage } = useLanguage();
     const settings = useTenantSettings();
+    const { isConnected: btConnected, isConnecting: btConnecting, deviceName: btDeviceName, connect: btConnect, disconnect: btDisconnect, printReceipt } = usePrinter();
     const { data: session } = authClient.useSession();
     const isOwner = (session?.user as AuthUser | undefined)?.role === 'owner';
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -375,9 +377,34 @@ export default function POSPage() {
         });
 
         if (settings.autoPrintReceipt) {
-            setTimeout(() => {
-                window.print();
-            }, 500);
+            if (btConnected) {
+                // Print via Bluetooth thermal printer
+                const orderForPrint = {
+                    orderId: orderId,
+                    items: cart.map(item => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: item.price,
+                        variantName: item.variantName,
+                    })),
+                    subtotal: total,
+                    tax: tax,
+                    total: grandTotal,
+                    discountAmount: discountAmount,
+                    discountName: appliedDiscount?.name,
+                };
+                printReceipt(orderForPrint, {
+                    name: tenant?.name || 'Awan POS Store',
+                    address: tenant?.address,
+                    phone: tenant?.phone,
+                    receiptFooter: tenant?.receiptFooter,
+                });
+            } else {
+                // Fallback to browser print
+                setTimeout(() => {
+                    window.print();
+                }, 500);
+            }
         }
         playSound('success', settings);
 
@@ -463,22 +490,22 @@ export default function POSPage() {
     const CartPanelContent = (
         <>
             {/* Cart Header */}
-            <div className="p-3 md:p-4 border-b flex items-center justify-between bg-gray-50/50">
-                <div className="flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5 text-primary" />
-                    <h2 className="font-bold text-base md:text-lg text-gray-800">{t.pos.currentOrder}</h2>
+            <div className="p-2 md:p-3 lg:p-4 border-b flex items-center justify-between bg-gray-50/50">
+                <div className="flex items-center gap-1.5">
+                    <ShoppingCart className="w-4 h-4 text-primary" />
+                    <h2 className="font-bold text-sm md:text-base lg:text-lg text-gray-800">{t.pos.currentOrder}</h2>
                     {cart.length > 0 && (
-                        <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                        <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                             {cart.length}
                         </span>
                     )}
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1">
                     {/* Held Carts */}
                     <Dialog>
                         <DialogTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50 border-orange-200" title="Held Carts">
-                                <Layers className="w-4 h-4" />
+                            <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50 border-orange-200" title="Held Carts">
+                                <Layers className="w-3.5 h-3.5" />
                                 {heldCarts.length > 0 && (
                                     <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{heldCarts.length}</span>
                                 )}
@@ -515,58 +542,57 @@ export default function POSPage() {
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-                    <Button variant="outline" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 border-blue-200" onClick={holdCart} disabled={cart.length === 0} title="Hold Cart">
-                        <Save className="w-4 h-4" />
+                    <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 border-blue-200" onClick={holdCart} disabled={cart.length === 0} title="Hold Cart">
+                        <Save className="w-3.5 h-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setCart([])} disabled={cart.length === 0} title="Clear Cart">
-                        <Trash2 className="w-4 h-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setCart([])} disabled={cart.length === 0} title="Clear Cart">
+                        <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                 </div>
             </div>
 
             {/* Cart Items */}
-            <ScrollArea className="flex-1 p-3 md:p-4">
+            <ScrollArea className="flex-1 p-2 md:p-3 lg:p-4">
                 {cart.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-3 opacity-50">
-                        <ShoppingCart className="w-14 h-14" />
-                        <p className="font-medium">Cart is empty</p>
-                        <p className="text-xs text-center px-6">Scan a barcode or tap a product to start</p>
+                    <div className="flex flex-col items-center justify-center h-32 md:h-48 text-gray-400 gap-2 opacity-50">
+                        <ShoppingCart className="w-10 h-10 md:w-14 md:h-14" />
+                        <p className="font-medium text-sm">Cart is empty</p>
+                        <p className="text-[10px] md:text-xs text-center px-6">Scan a barcode or tap a product to start</p>
                     </div>
                 ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                         {cart.map((item) => (
-                            <div key={(item.variantId || item.id)} className="flex gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm hover:border-primary/20 transition-colors">
+                            <div key={(item.variantId || item.id)} className="flex gap-2 p-2 md:p-2.5 bg-white rounded-lg border border-gray-100 shadow-sm hover:border-primary/20 transition-colors">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start">
-                                        <div className="min-w-0 pr-2">
-                                            <h4 className="font-medium text-gray-800 truncate text-sm">{item.name}</h4>
+                                    <div className="flex justify-between items-center">
+                                        <div className="min-w-0 pr-1.5 flex-1">
+                                            <h4 className="font-medium text-gray-800 truncate text-xs md:text-sm">{item.name}</h4>
                                             {item.variantName && (
-                                                <p className="text-xs text-gray-500 truncate">{item.variantName}</p>
+                                                <p className="text-[10px] md:text-xs text-gray-500 truncate">{item.variantName}</p>
                                             )}
                                         </div>
-                                        {/* Always-visible delete on touch */}
                                         <button
                                             onClick={() => removeFromCart(item.variantId || item.id)}
-                                            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                                         >
-                                            <X className="w-4 h-4" />
+                                            <X className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
-                                    <div className="flex items-center justify-between mt-2">
-                                        <div className="font-bold text-primary text-sm">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</div>
-                                        <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                                    <div className="flex items-center justify-between mt-1">
+                                        <div className="font-bold text-primary text-xs md:text-sm">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</div>
+                                        <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden">
                                             <button
-                                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
+                                                className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
                                                 onClick={() => updateQuantity(item.variantId || item.id, -1)}
                                             >
-                                                <Minus className="w-3.5 h-3.5" />
+                                                <Minus className="w-3 h-3" />
                                             </button>
-                                            <span className="text-sm font-bold w-6 text-center select-none">{item.quantity}</span>
+                                            <span className="text-xs font-bold w-5 md:w-6 text-center select-none">{item.quantity}</span>
                                             <button
-                                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
+                                                className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
                                                 onClick={() => updateQuantity(item.variantId || item.id, 1)}
                                             >
-                                                <Plus className="w-3.5 h-3.5" />
+                                                <Plus className="w-3 h-3" />
                                             </button>
                                         </div>
                                     </div>
@@ -578,13 +604,13 @@ export default function POSPage() {
             </ScrollArea>
 
             {/* Cart Footer */}
-            <div className="p-3 md:p-4 bg-white border-t space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="p-2 md:p-3 lg:p-4 bg-white border-t space-y-2 md:space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <CustomerSelector
                     selectedCustomer={selectedCustomer}
                     onSelectCustomer={setSelectedCustomer}
                 />
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{t.pos.subtotal}</span>
                         <span className="font-medium">{formatCurrencyWithSettings(total, settings)}</span>
@@ -639,14 +665,14 @@ export default function POSPage() {
                         </div>
                     )}
 
-                    <div className="flex justify-between items-center pt-3 border-t border-dashed">
-                        <span className="text-base font-semibold text-gray-700">{t.pos.total}</span>
-                        <span className="text-2xl font-bold text-primary">{formatCurrencyWithSettings(grandTotal, settings)}</span>
+                    <div className="flex justify-between items-center pt-2 md:pt-3 border-t border-dashed">
+                        <span className="text-sm md:text-base font-semibold text-gray-700">{t.pos.total}</span>
+                        <span className="text-lg md:text-2xl font-bold text-primary">{formatCurrencyWithSettings(grandTotal, settings)}</span>
                     </div>
                 </div>
 
                 <Button
-                    className="w-full h-13 text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl"
+                    className="w-full h-10 md:h-12 text-sm md:text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl"
                     size="lg"
                     disabled={cart.length === 0 || loading}
                     onClick={handleCheckout}
@@ -660,26 +686,54 @@ export default function POSPage() {
     return (
         <div className="h-screen bg-gray-50 flex overflow-hidden">
             {isOwner && (
-                <div className="print:hidden h-full shrink-0">
+                <div className="print:hidden h-full shrink-0 hidden xl:block">
                     <Sidebar />
                 </div>
             )}
             <div className="print:hidden h-full flex flex-col flex-1 overflow-hidden min-w-0">
                 {/* ── Header ── */}
-                <header className="bg-white border-b px-3 md:px-6 py-3 flex items-center justify-between shrink-0 h-14 md:h-16">
-                    <div className="flex items-center gap-2 md:gap-4 min-w-0">
-                        <div className="p-1.5 bg-primary/10 rounded-lg shrink-0">
-                            <Menu className="w-5 h-5 text-primary" />
-                        </div>
-                        <h1 className="text-base md:text-xl font-bold text-gray-800 truncate">{tenant?.name || 'Awan POS'}</h1>
+                <header className="bg-white border-b px-2 md:px-4 lg:px-6 py-2 md:py-3 flex items-center justify-between shrink-0 h-12 md:h-14 lg:h-16">
+                    <div className="flex items-center gap-1.5 md:gap-3 min-w-0">
+                        <Link href="/dashboard/analytics" className="p-1 md:p-1.5 bg-primary/10 rounded-lg shrink-0 xl:hidden">
+                            <Menu className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                        </Link>
+                        <h1 className="text-sm md:text-base lg:text-xl font-bold text-gray-800 truncate">{tenant?.name || 'Awan POS'}</h1>
                         <OfflineIndicator />
                     </div>
-                    <div className="flex items-center gap-2">
-                        {/* Clock: hidden on very small screens */}
-                        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
-                            <Clock className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1 md:gap-2">
+                        {/* Clock: hidden on small screens */}
+                        <div className="hidden md:flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-full text-[11px] font-medium text-gray-600">
+                            <Clock className="w-3 h-3" />
                             <span>{formatTimeWithSettings(new Date(), settings)}</span>
                         </div>
+                        {/* Bluetooth Printer Indicator / Connect */}
+                        <button
+                            className={cn(
+                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-colors",
+                                btConnected
+                                    ? "bg-green-50 text-green-700 hover:bg-green-100"
+                                    : btConnecting
+                                        ? "bg-yellow-50 text-yellow-700"
+                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            )}
+                            onClick={() => btConnected ? btDisconnect() : btConnect()}
+                            disabled={btConnecting}
+                            title={btConnected ? `Connected: ${btDeviceName} (click to disconnect)` : btConnecting ? 'Connecting...' : 'Connect Bluetooth Printer'}
+                        >
+                            {btConnecting ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : btConnected ? (
+                                <Bluetooth className="w-3.5 h-3.5" />
+                            ) : (
+                                <BluetoothOff className="w-3.5 h-3.5" />
+                            )}
+                            <span className="hidden sm:inline">
+                                {btConnecting ? 'Connecting' : btConnected ? btDeviceName : 'Printer'}
+                            </span>
+                            {btConnected && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            )}
+                        </button>
                         {/* Language toggle */}
                         <button
                             className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"
@@ -689,7 +743,7 @@ export default function POSPage() {
                             <span className="hidden sm:inline">{language.toUpperCase()}</span>
                         </button>
                         {/* Avatar */}
-                        <div className="w-8 h-8 md:w-9 md:h-9 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold shadow-md shrink-0">
+                        <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold shadow-md shrink-0">
                             {tenant?.name?.substring(0, 2).toUpperCase() || 'ST'}
                         </div>
                     </div>
@@ -699,12 +753,12 @@ export default function POSPage() {
                 <div className="flex-1 flex overflow-hidden relative">
 
                     {/* Left: Product Grid */}
-                    <div className="flex-1 flex flex-col p-3 md:p-5 gap-3 md:gap-4 overflow-hidden min-w-0">
+                    <div className="flex-1 flex flex-col p-2 md:p-3 lg:p-5 gap-2 md:gap-3 lg:gap-4 overflow-hidden min-w-0">
                         {/* Search */}
                         <div className="relative shrink-0">
-                            <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <Input
-                                className="pl-9 md:pl-12 h-10 md:h-12 text-sm md:text-base rounded-xl border-gray-200 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all"
+                                className="pl-9 md:pl-10 h-9 md:h-10 lg:h-12 text-sm rounded-xl border-gray-200 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all"
                                 placeholder={t.pos.searchPlaceholder}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -739,7 +793,7 @@ export default function POSPage() {
                                     <span className="text-sm">No products found</span>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 md:gap-3 pb-24 lg:pb-4">
+                                <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-1.5 md:gap-2 lg:gap-3 pb-20 lg:pb-4">
                                     {products.map((product) => {
                                         const imgUrl = product.imageUrl || product.variants?.[0]?.imageUrl;
                                         return (
@@ -771,8 +825,8 @@ export default function POSPage() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <CardContent className="p-2 md:p-3">
-                                                    <h3 className="font-semibold text-gray-800 truncate text-xs md:text-sm" title={product.name}>{product.name}</h3>
+                                                <CardContent className="p-1.5 md:p-2 lg:p-3">
+                                                    <h3 className="font-semibold text-gray-800 truncate text-[11px] md:text-xs lg:text-sm" title={product.name}>{product.name}</h3>
                                                 </CardContent>
                                             </Card>
                                         );
@@ -797,12 +851,12 @@ export default function POSPage() {
                     {/* ── Mobile Cart FAB (< lg) ── */}
                     {!showMobileCart && (
                         <button
-                            className="lg:hidden fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-primary text-primary-foreground px-4 py-3 rounded-full shadow-2xl shadow-primary/30 font-semibold text-sm active:scale-95 transition-transform"
+                            className="lg:hidden fixed bottom-4 right-4 z-40 flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2.5 rounded-full shadow-2xl shadow-primary/30 font-semibold text-xs active:scale-95 transition-transform"
                             onClick={() => setShowMobileCart(true)}
                         >
-                            <ShoppingCart className="w-5 h-5" />
+                            <ShoppingCart className="w-4 h-4" />
                             {cart.length > 0 && (
-                                <span className="bg-white text-primary text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center">
+                                <span className="bg-white text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-4 text-center">
                                     {cart.length}
                                 </span>
                             )}
@@ -819,7 +873,7 @@ export default function POSPage() {
                                 onClick={() => setShowMobileCart(false)}
                             />
                             {/* Drawer */}
-                            <div className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[90dvh] min-h-[60dvh]">
+                            <div className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[85dvh] min-h-[50dvh]">
                                 {/* Drag handle + close */}
                                 <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0">
                                     <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />

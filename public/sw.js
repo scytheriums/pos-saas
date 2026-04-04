@@ -5,19 +5,26 @@ const OFFLINE_URL = '/offline';
 // Assets to cache on install
 const STATIC_ASSETS = [
     '/',
-    '/pos',
-    '/dashboard',
     '/offline',
     '/manifest.json',
 ];
 
-// Install event - cache static assets
+// Install event - cache static assets (tolerates individual failures)
 self.addEventListener('install', (event) => {
     console.log('[Service Worker] Installing...');
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('[Service Worker] Caching static assets');
-            return cache.addAll(STATIC_ASSETS);
+        caches.open(CACHE_NAME).then(async (cache) => {
+            // Cache each asset individually so one failure doesn't block install
+            for (const url of STATIC_ASSETS) {
+                try {
+                    const response = await fetch(url, { redirect: 'manual' });
+                    if (response.ok || response.type === 'opaqueredirect') {
+                        await cache.put(url, response);
+                    }
+                } catch (e) {
+                    console.warn(`[Service Worker] Failed to cache ${url}:`, e);
+                }
+            }
         })
     );
     self.skipWaiting();
