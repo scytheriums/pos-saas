@@ -382,6 +382,8 @@ export default function POSPage() {
                 // Direct Bluetooth thermal print (mobile & desktop)
                 const orderForPrint = {
                     orderId: orderId,
+                    date: new Date(),
+                    cashierName: cashierName,
                     items: cart.map(item => ({
                         name: item.name,
                         quantity: item.quantity,
@@ -398,7 +400,9 @@ export default function POSPage() {
                     name: tenant?.name || 'Awan POS Store',
                     address: tenant?.address,
                     phone: tenant?.phone,
+                    receiptHeader: tenant?.receiptHeader,
                     receiptFooter: tenant?.receiptFooter,
+                    taxRate: tenant?.taxRate,
                 });
             } else if (!isMobile) {
                 // Desktop only: fallback to browser print dialog
