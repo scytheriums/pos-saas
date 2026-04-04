@@ -206,7 +206,8 @@ export async function POST(req: NextRequest) {
                                 variantId,
                                 quantity: item.quantity,
                                 price: new Prisma.Decimal(variantData?.price || item.price),
-                                cost: new Prisma.Decimal(variantData?.cost || 0)
+                                cost: new Prisma.Decimal(variantData?.cost || 0),
+                                itemDiscount: new Prisma.Decimal(item.itemDiscount || 0),
                             };
                         })
                     }

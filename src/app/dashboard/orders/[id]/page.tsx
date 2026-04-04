@@ -36,6 +36,7 @@ interface OrderDetails {
         id: string;
         quantity: number;
         price: number;
+        itemDiscount: number;
         variant: {
             sku: string;
             product: {
@@ -145,7 +146,7 @@ export default function OrderDetailsPage() {
     }
 
     // Calculate subtotal and tax for receipt
-    const subtotal = order.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+    const subtotal = order.items.reduce((sum, item) => sum + Number(item.price) * item.quantity - Number(item.itemDiscount || 0), 0);
     const taxRate = (tenant?.taxRate ?? 0) / 100;
     const tax = subtotal * taxRate;
 
@@ -261,13 +262,19 @@ export default function OrderDetailsPage() {
                                     <div className="flex-1">
                                         <p className="font-medium">{item.variant.product.name}</p>
                                         <p className="text-sm text-muted-foreground">SKU: {item.variant.sku}</p>
+                                        {item.variant.optionValues.length > 0 && (
+                                            <p className="text-sm text-muted-foreground">{item.variant.optionValues.map(ov => ov.value).join(' / ')}</p>
+                                        )}
                                     </div>
                                     <div className="text-right">
                                         <p className="font-medium">{formatCurrencyWithSettings(Number(item.price), settings)}</p>
                                         <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                                        {Number(item.itemDiscount || 0) > 0 && (
+                                            <p className="text-sm text-green-600">-{formatCurrencyWithSettings(Number(item.itemDiscount), settings)}</p>
+                                        )}
                                     </div>
-                                    <div className="ml-4 text-right min-w-[80px]">
-                                        <p className="font-bold">{formatCurrencyWithSettings(Number(item.price) * item.quantity, settings)}</p>
+                                    <div className="ml-4 text-right min-w-20">
+                                        <p className="font-bold">{formatCurrencyWithSettings(Number(item.price) * item.quantity - Number(item.itemDiscount || 0), settings)}</p>
                                     </div>
                                 </div>
                             ))}
@@ -296,6 +303,7 @@ export default function OrderDetailsPage() {
                     variantName: item.variant.optionValues.length > 0
                         ? item.variant.optionValues.map(ov => ov.value).join(' / ')
                         : undefined,
+                    itemDiscount: Number(item.itemDiscount || 0) > 0 ? Number(item.itemDiscount) : undefined,
                 }))}
                 subtotal={subtotal}
                 tax={tax}

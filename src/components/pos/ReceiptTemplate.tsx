@@ -7,6 +7,7 @@ interface ReceiptItem {
     quantity: number;
     price: number;
     variantName?: string;
+    itemDiscount?: number;
 }
 
 interface ReceiptProps {
@@ -87,14 +88,22 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                         </thead>
                         <tbody>
                             {items.map((item, index) => (
-                                <tr key={index}>
-                                    <td className="py-1 pr-1">
-                                        <div className="font-bold">{item.name}</div>
-                                        {item.variantName && <div className="text-[9px] font-medium">{item.variantName}</div>}
-                                    </td>
-                                    <td className="py-1 text-right align-top">{item.quantity}</td>
-                                    <td className="py-1 text-right align-top">{fmt(item.price * item.quantity)}</td>
-                                </tr>
+                                <React.Fragment key={index}>
+                                    <tr>
+                                        <td className="py-1 pr-1">
+                                            <div className="font-bold">{item.name}</div>
+                                            {item.variantName && <div className="text-[9px] font-medium">{item.variantName}</div>}
+                                        </td>
+                                        <td className="py-1 text-right align-top">{item.quantity}</td>
+                                        <td className={`py-1 text-right align-top${(item.itemDiscount ?? 0) > 0 ? " line-through" : ""}`}>{fmt(item.price * item.quantity)}</td>
+                                    </tr>
+                                    {(item.itemDiscount ?? 0) > 0 && (
+                                        <tr>
+                                            <td className="pb-1 text-[9px] italic" colSpan={2}>└ Diskon item</td>
+                                            <td className="pb-1 text-right text-[9px] italic">-{fmt(item.itemDiscount!)}</td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
@@ -106,6 +115,7 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                         <span>Subtotal</span>
                         <span>{fmt(subtotal)}</span>
                     </div>
+                    
                     {tax > 0 && (
                         <div className="flex justify-between">
                             <span>Tax ({settings.taxRate}%)</span>
@@ -118,6 +128,15 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                             <span>-{fmt(discountAmount!)}</span>
                         </div>
                     )}
+                    {(() => {
+                        const totalItemDiscount = items.reduce((sum, item) => sum + (item.itemDiscount || 0), 0);
+                        return totalItemDiscount > 0 ? (
+                            <div className="flex justify-between text-[9px] italic">
+                                <span>Item Discount</span>
+                                <span>-{fmt(totalItemDiscount)}</span>
+                            </div>
+                        ) : null;
+                    })()}
                     <div className="flex justify-between font-bold text-sm mt-1">
                         <span>Total</span>
                         <span>{fmt(total)}</span>

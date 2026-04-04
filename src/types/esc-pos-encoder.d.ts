@@ -12,5 +12,9 @@ declare module 'esc-pos-encoder' {
         encode(): Uint8Array;
         table(columns: Array<{ width: number; align?: 'left' | 'center' | 'right' }>, data: string[][]): EscPosEncoder;
         raw(data: number[]): EscPosEncoder;
+        image(element: HTMLCanvasElement | ImageData, width: number, height: number, algorithm?: string, threshold?: number): EscPosEncoder;
+        font(type: 'A' | 'B' | 'C'): EscPosEncoder;
+        invert(enabled: boolean): EscPosEncoder;
+        italic(enabled: boolean): EscPosEncoder;
     }
 }

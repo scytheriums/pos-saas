@@ -326,14 +326,15 @@ model Order {
 }
 
 model OrderItem {
-  id        String         @id @default(cuid())
-  orderId   String
-  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variantId String
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
-  quantity  Int
-  price     Decimal // Snapshot of price at time of sale
-  cost      Decimal @default(0) // Snapshot of cost at time of sale
+  id           String         @id @default(cuid())
+  orderId      String
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId    String
+  variant      ProductVariant @relation(fields: [variantId], references: [id])
+  quantity     Int
+  price        Decimal // Snapshot of price at time of sale
+  cost         Decimal @default(0) // Snapshot of cost at time of sale
+  itemDiscount Decimal @default(0) // Per-item discount amount
 }
 
 model StockAdjustment {

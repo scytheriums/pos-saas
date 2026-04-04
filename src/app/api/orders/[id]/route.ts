@@ -37,7 +37,8 @@ export async function GET(
                                 }
                             }
                         }
-                    }
+                    },
+                    orderBy: { id: 'asc' },
                 },
                 discount: true,
                 customer: true

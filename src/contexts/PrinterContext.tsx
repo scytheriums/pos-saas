@@ -112,6 +112,8 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
 
             // ── Helpers for 32-char wide 58mm paper ──
             const WIDTH = 32;
+            // 58mm thermal paper printable width at 203 DPI (~48mm = 384 dots), must be multiple of 8
+            const PRINTER_DOTS = 384;
             const DIVIDER = '-'.repeat(WIDTH);
             const fmt = (n: number) =>
                 new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n);
@@ -130,21 +132,78 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
                 if (text) lines.push(text);
                 return lines;
             };
+            /** Detect Arabic/RTL Unicode characters */
+            const hasArabic = (text?: string): boolean =>
+                !!text && /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+            /**
+             * Render text onto an HTMLCanvasElement for Arabic/RTL Bluetooth printing.
+             * ESC/POS printers don't support Arabic codepages natively, so we send
+             * the text as a bitmap image which preserves correct RTL rendering.
+             * Width is fixed to PRINTER_DOTS; height is calculated from line count.
+             */
+            const renderTextAsImage = (text: string): HTMLCanvasElement | null => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return null;
+                    const fontSize = 20;
+                    const lineHeight = 28;
+                    const paddingV = 4;
+                    const paddingH = 8;
+                    const lines = text.split('\n').filter(l => l.trim() !== '');
+                    canvas.width = PRINTER_DOTS; // multiple of 8 ✓
+                    const rawHeight = lines.length * lineHeight + paddingV * 2;
+                    canvas.height = Math.ceil(rawHeight / 8) * 8; // round up to multiple of 8
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#000000';
+                    ctx.font = `${fontSize}px "Arial Unicode MS", "Noto Sans Arabic", Arial, sans-serif`;
+                    ctx.textBaseline = 'top';
+                    ctx.direction = 'rtl';
+                    ctx.textAlign = 'right';
+                    lines.forEach((line, i) => {
+                        ctx.fillText(line, PRINTER_DOTS - paddingH, paddingV + i * lineHeight);
+                    });
+                    return canvas;
+                } catch {
+                    return null;
+                }
+            };
+            /** Print a text block — uses image rendering when Arabic is detected */
+            const printTextBlock = (text: string) => {
+                if (hasArabic(text)) {
+                    const canvas = renderTextAsImage(text);
+                    if (canvas) r.image(canvas, PRINTER_DOTS, canvas.height);
+                } else {
+                    text.split('\n').forEach((l: string) => {
+                        wrapLine(l).forEach((ll: string) => r.line(ll));
+                    });
+                }
+            };
 
             const encoder = new EscPosEncoder();
             let r = encoder.initialize();
 
             // ── Store header (mirrors ReceiptTemplate header block) ──
-            r.align('center').bold(true).line(settings.name || 'Store Name').bold(false);
+            r.align('center');
+            if (hasArabic(settings.name)) {
+                const canvas = renderTextAsImage(settings.name || 'Store Name');
+                if (canvas) r.image(canvas, PRINTER_DOTS, canvas.height);
+            } else {
+                r.bold(true).line(settings.name || 'Store Name').bold(false);
+            }
             if (settings.address) {
-                wrapLine(settings.address).forEach((l: string) => r.line(l));
+                if (hasArabic(settings.address)) {
+                    const canvas = renderTextAsImage(settings.address);
+                    if (canvas) r.image(canvas, PRINTER_DOTS, canvas.height);
+                } else {
+                    wrapLine(settings.address).forEach((l: string) => r.line(l));
+                }
             }
             if (settings.phone) r.line(settings.phone);
             if (settings.receiptHeader) {
                 r.newline();
-                settings.receiptHeader.split('\n').forEach((l: string) => {
-                    wrapLine(l).forEach((ll: string) => r.line(ll));
-                });
+                printTextBlock(settings.receiptHeader);
             }
             r.line(DIVIDER);
 
@@ -155,7 +214,6 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
                 : new Date().toLocaleString('id-ID');
             r.line(padRow('Date:', dateStr));
             r.line(padRow('Order ID:', '#' + order.orderId.slice(-6).toUpperCase()));
-            if (order.cashierName) r.line(padRow('Cashier:', order.cashierName));
             r.line(DIVIDER);
 
             // ── Items header (mirrors ReceiptTemplate table header) ──
@@ -172,11 +230,15 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
                     : item.name;
                 r.line(padRow(nameLine, qtyPrice));
                 if (item.variantName) r.line('  (' + item.variantName + ')');
+                if (item.itemDiscount && item.itemDiscount > 0) {
+                    r.line(padRow('  Disc', '-' + fmt(item.itemDiscount)));
+                }
             });
             r.line(DIVIDER);
 
             // ── Totals (mirrors ReceiptTemplate totals block) ──
             r.line(padRow('Subtotal', fmt(order.subtotal)));
+            
             if (order.tax > 0) {
                 const taxLabel = settings.taxRate ? `Tax (${settings.taxRate}%)` : 'Tax';
                 r.line(padRow(taxLabel, fmt(order.tax)));
@@ -187,6 +249,10 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
                     : 'Discount';
                 r.line(padRow(discLabel, '-' + fmt(order.discountAmount)));
             }
+            const totalItemDiscount = order.items.reduce((acc: number, item: any) => acc + (item.itemDiscount || 0), 0);
+            if (totalItemDiscount > 0) {
+                r.line(padRow('Item Discount', '-' + fmt(totalItemDiscount)));
+            }
             r.line(DIVIDER);
             r.bold(true).line(padRow('TOTAL', fmt(order.total))).bold(false);
             r.line(DIVIDER);
@@ -194,9 +260,7 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
             // ── Footer (mirrors ReceiptTemplate footer block) ──
             r.align('center');
             if (settings.receiptFooter) {
-                settings.receiptFooter.split('\n').forEach((l: string) => {
-                    wrapLine(l).forEach((ll: string) => r.line(ll));
-                });
+                printTextBlock(settings.receiptFooter);
             } else {
                 r.line('Thank you for your purchase!');
                 r.line('Please come again.');

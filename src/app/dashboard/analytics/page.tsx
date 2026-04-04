@@ -272,25 +272,28 @@ export default function AnalyticsPage() {
             {/* Metric Cards — 2 cols on mobile, 4 on desktop */}
             <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
                 <MetricCard
+                    className="gap-0 py-3 lg:py-6"
                     title="Revenue"
                     value={formatCurrencyWithSettings(summary?.totalRevenue || 0, settings)}
                     icon={DollarSign}
                     description="Gross revenue"
                 />
                 <MetricCard
+                    className="gap-0 py-3 lg:py-6"
                     title="Profit"
                     value={formatCurrencyWithSettings(summary?.totalProfit || 0, settings)}
                     icon={TrendingUp}
                     description={`Margin: ${summary?.margin.toFixed(1)}%`}
-                    trend={{ value: summary?.margin || 0, label: "margin", positive: (summary?.margin || 0) > 20 }}
                 />
                 <MetricCard
+                    className="gap-0 py-3 lg:py-6"
                     title="Orders"
                     value={summary?.totalOrders || 0}
                     icon={ShoppingCart}
                     description="Completed"
                 />
                 <MetricCard
+                    className="gap-0 py-3 lg:py-6"
                     title="Avg Order"
                     value={formatCurrencyWithSettings(summary?.averageOrderValue || 0, settings)}
                     icon={CreditCard}

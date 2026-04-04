@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2 } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +61,7 @@ const playSound = (type: 'success' | 'error' | 'click', settings: any) => {
     }
 };
 
-type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string; variantName?: string };
+type CartItem = { id: string; name: string; price: number; quantity: number; variantId?: string; variantName?: string; itemDiscount?: number };
 type HeldCart = { id: string; items: CartItem[]; timestamp: number; total: number };
 
 export default function POSPage() {
@@ -84,12 +84,16 @@ export default function POSPage() {
     const [validatingDiscount, setValidatingDiscount] = useState(false);
     const [discountError, setDiscountError] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; email?: string } | null>(null);
+    const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
 
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
     const [tenant, setTenant] = useState<any>(null);
-    const [showMobileCart, setShowMobileCart] = useState(false);
+    const [cartMounted, setCartMounted] = useState(false);
+    const [cartOpen, setCartOpen] = useState(false);
+    const cartDrawerRef = useRef<HTMLDivElement>(null);
+    const cartTouchStartY = useRef(0);
 
     // Pagination state
     const [page, setPage] = useState(1);
@@ -280,7 +284,17 @@ export default function POSPage() {
         );
     };
 
-    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const updateItemDiscount = (cartItemId: string, discount: number) => {
+        setCart(prev => prev.map(item => {
+            if ((item.variantId || item.id) === cartItemId) {
+                const maxDiscount = item.price * item.quantity;
+                return { ...item, itemDiscount: discount > 0 ? Math.min(discount, maxDiscount) : undefined };
+            }
+            return item;
+        }));
+    };
+
+    const total = cart.reduce((sum, item) => sum + item.price * item.quantity - (item.itemDiscount || 0), 0);
     const taxRate = (tenant?.taxRate ?? 0) / 100;
     const tax = total * taxRate;
     const grandTotal = total + tax - discountAmount;
@@ -359,6 +373,37 @@ export default function POSPage() {
         setHeldCarts(prev => prev.filter(c => c.id !== id));
     };
 
+    const openMobileCart = () => {
+        setCartMounted(true);
+        requestAnimationFrame(() => requestAnimationFrame(() => setCartOpen(true)));
+    };
+
+    const closeMobileCart = () => {
+        setCartOpen(false);
+        setTimeout(() => setCartMounted(false), 350);
+    };
+
+    const handleCartTouchStart = (e: React.TouchEvent) => {
+        cartTouchStartY.current = e.touches[0].clientY;
+        if (cartDrawerRef.current) cartDrawerRef.current.style.transition = 'none';
+    };
+
+    const handleCartTouchMove = (e: React.TouchEvent) => {
+        const delta = e.touches[0].clientY - cartTouchStartY.current;
+        if (delta > 0 && cartDrawerRef.current) {
+            cartDrawerRef.current.style.transform = `translateY(${delta}px)`;
+        }
+    };
+
+    const handleCartTouchEnd = (e: React.TouchEvent) => {
+        const delta = e.changedTouches[0].clientY - cartTouchStartY.current;
+        if (cartDrawerRef.current) {
+            cartDrawerRef.current.style.transition = '';
+            cartDrawerRef.current.style.transform = '';
+        }
+        if (delta > 80) closeMobileCart();
+    };
+
     const processSuccessfulOrder = (orderId: string, cashierName: string, isOffline = false) => {
         setLastOrder({
             orderId: orderId,
@@ -369,6 +414,7 @@ export default function POSPage() {
                 quantity: item.quantity,
                 price: item.price,
                 variantName: item.variantName,
+                itemDiscount: item.itemDiscount,
             })),
             subtotal: total,
             tax: tax,
@@ -390,6 +436,7 @@ export default function POSPage() {
                         quantity: item.quantity,
                         price: item.price,
                         variantName: item.variantName,
+                        itemDiscount: item.itemDiscount,
                     })),
                     subtotal: total,
                     tax: tax,
@@ -439,7 +486,8 @@ export default function POSPage() {
                 productId: item.id,
                 variantId: item.variantId,
                 quantity: item.quantity,
-                price: item.price
+                price: item.price,
+                itemDiscount: item.itemDiscount || 0,
             })),
             total: grandTotal,
             tenantId: "default-tenant",
@@ -586,7 +634,23 @@ export default function POSPage() {
                                         </button>
                                     </div>
                                     <div className="flex items-center justify-between mt-1">
-                                        <div className="font-bold text-primary text-xs md:text-sm">{formatCurrencyWithSettings(item.price * item.quantity, settings)}</div>
+                                        <div className="flex items-center gap-1">
+                                            <div className={cn("font-bold text-xs md:text-sm", (item.itemDiscount ?? 0) > 0 ? "text-gray-400 line-through" : "text-primary")}>
+                                                {formatCurrencyWithSettings(item.price * item.quantity, settings)}
+                                            </div>
+                                            {(item.itemDiscount ?? 0) > 0 && (
+                                                <div className="font-bold text-primary text-xs md:text-sm">
+                                                    {formatCurrencyWithSettings(item.price * item.quantity - item.itemDiscount!, settings)}
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => setEditingDiscountId(editingDiscountId === (item.variantId || item.id) ? null : (item.variantId || item.id))}
+                                                className={cn("transition-colors", (item.itemDiscount ?? 0) > 0 ? "text-green-500" : "text-gray-300 hover:text-green-500")}
+                                                title="Item discount"
+                                            >
+                                                <Tag className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                         <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden">
                                             <button
                                                 className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
@@ -603,6 +667,28 @@ export default function POSPage() {
                                             </button>
                                         </div>
                                     </div>
+                                    {editingDiscountId === (item.variantId || item.id) && (
+                                        <div className="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-gray-100">
+                                            <Tag className="w-3 h-3 text-green-500 shrink-0" />
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                autoFocus
+                                                placeholder="0"
+                                                defaultValue={item.itemDiscount || ""}
+                                                onChange={(e) => updateItemDiscount(item.variantId || item.id, parseFloat(e.target.value) || 0)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingDiscountId(null); }}
+                                                className="h-6 text-xs px-1.5 py-0 flex-1 min-w-0 border-green-300 focus-visible:ring-green-400"
+                                            />
+                                            <button
+                                                onClick={() => { updateItemDiscount(item.variantId || item.id, 0); setEditingDiscountId(null); }}
+                                                className="text-red-400 hover:text-red-600 shrink-0"
+                                                title="Clear discount"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -857,10 +943,10 @@ export default function POSPage() {
                     </div>
 
                     {/* ── Mobile Cart FAB (< lg) ── */}
-                    {!showMobileCart && (
+                    {!cartMounted && (
                         <button
                             className="lg:hidden fixed bottom-4 right-4 z-40 flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2.5 rounded-full shadow-2xl shadow-primary/30 font-semibold text-xs active:scale-95 transition-transform"
-                            onClick={() => setShowMobileCart(true)}
+                            onClick={openMobileCart}
                         >
                             <ShoppingCart className="w-4 h-4" />
                             {cart.length > 0 && (
@@ -873,21 +959,27 @@ export default function POSPage() {
                     )}
 
                     {/* ── Mobile Cart Overlay (< lg) ── */}
-                    {showMobileCart && (
+                    {cartMounted && (
                         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
                             {/* Backdrop */}
                             <div
-                                className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-                                onClick={() => setShowMobileCart(false)}
+                                className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${cartOpen ? 'opacity-100' : 'opacity-0'}`}
+                                onClick={closeMobileCart}
                             />
                             {/* Drawer */}
-                            <div className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[85dvh] min-h-[50dvh]">
+                            <div
+                                ref={cartDrawerRef}
+                                className={`relative bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[85dvh] min-h-[50dvh] transition-transform duration-300 ease-out will-change-transform ${cartOpen ? 'translate-y-0' : 'translate-y-full'}`}
+                                onTouchStart={handleCartTouchStart}
+                                onTouchMove={handleCartTouchMove}
+                                onTouchEnd={handleCartTouchEnd}
+                            >
                                 {/* Drag handle + close */}
                                 <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0">
                                     <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
                                     <button
                                         className="ml-auto p-1 rounded-full text-gray-500 hover:bg-gray-100"
-                                        onClick={() => setShowMobileCart(false)}
+                                        onClick={closeMobileCart}
                                     >
                                         <ChevronDown className="w-5 h-5" />
                                     </button>
