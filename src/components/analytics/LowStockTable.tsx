@@ -39,7 +39,7 @@ export function LowStockTable({ items, threshold }: LowStockTableProps) {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Product</TableHead>
-                                    <TableHead>SKU</TableHead>
+                                    <TableHead className="hidden sm:table-cell">SKU</TableHead>
                                     <TableHead className="text-right">Stock</TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
@@ -48,7 +48,7 @@ export function LowStockTable({ items, threshold }: LowStockTableProps) {
                                 {items.map((item) => (
                                     <TableRow key={item.id}>
                                         <TableCell className="font-medium">{item.productName}</TableCell>
-                                        <TableCell className="font-mono text-sm">{item.sku}</TableCell>
+                                        <TableCell className="font-mono text-sm hidden sm:table-cell">{item.sku}</TableCell>
                                         <TableCell className="text-right">
                                             <span className={item.currentStock === 0 ? 'text-red-600 font-bold' : ''}>
                                                 {item.currentStock}

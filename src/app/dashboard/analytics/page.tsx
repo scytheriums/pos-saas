@@ -5,14 +5,14 @@ import { SalesChart } from '@/components/analytics/SalesChart';
 import { LowStockTable } from '@/components/analytics/LowStockTable';
 import { TopProductsTable } from '@/components/analytics/TopProductsTable';
 import { CategoryPieChart } from '@/components/analytics/CategoryPieChart';
-import { DatePickerWithRange } from '@/components/ui/date-range-picker';
-import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Download } from 'lucide-react';
-import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
+import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Download, SlidersHorizontal } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { formatCurrencyWithSettings } from '@/lib/format';
 import { useTenantSettings } from '@/contexts/SettingsContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { DateRange } from 'react-day-picker';
-import { addDays, startOfDay, endOfDay, format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { addDays, startOfDay, endOfDay, startOfMonth, format } from 'date-fns';
 
 interface SummaryData {
     totalRevenue: number;
@@ -61,12 +61,33 @@ interface LowStockData {
     threshold: number;
 }
 
+function getDateRange(preset: string) {
+    const now = new Date();
+    switch (preset) {
+        case 'today': return { from: startOfDay(now), to: endOfDay(now) };
+        case '7d':    return { from: addDays(now, -7), to: now };
+        case '90d':   return { from: addDays(now, -90), to: now };
+        case 'month': return { from: startOfMonth(now), to: now };
+        case '1y':    return { from: addDays(now, -365), to: now };
+        default:      return { from: addDays(now, -30), to: now }; // '30d'
+    }
+}
+
 export default function AnalyticsPage() {
     const settings = useTenantSettings();
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: addDays(new Date(), -30),
-        to: new Date(),
-    });
+    const [datePreset, setDatePreset] = useState('30d');
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [pendingPreset, setPendingPreset] = useState('30d');
+
+    const handleFilterOpen = (open: boolean) => {
+        if (open) setPendingPreset(datePreset);
+        setFilterOpen(open);
+    };
+
+    const applyFilter = () => {
+        setDatePreset(pendingPreset);
+        setFilterOpen(false);
+    };
 
     const [summary, setSummary] = useState<SummaryData | null>(null);
     const [topProducts, setTopProducts] = useState<ProductStat[]>([]);
@@ -82,8 +103,9 @@ export default function AnalyticsPage() {
             setLoading(true);
             try {
                 const queryParams = new URLSearchParams();
-                if (dateRange?.from) queryParams.append('startDate', dateRange.from.toISOString());
-                if (dateRange?.to) queryParams.append('endDate', dateRange.to.toISOString());
+                const range = getDateRange(datePreset);
+                if (range.from) queryParams.append('startDate', range.from.toISOString());
+                if (range.to) queryParams.append('endDate', range.to.toISOString());
 
                 const queryString = queryParams.toString();
 
@@ -124,14 +146,15 @@ export default function AnalyticsPage() {
         }
 
         fetchAnalytics();
-    }, [dateRange]);
+    }, [datePreset]);
 
     const handleExport = () => {
         if (!summary || !topProducts || !categories) return;
 
+        const range = getDateRange(datePreset);
         const csvContent = [
             ['Analytics Report'],
-            [`Date Range: ${dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''} to ${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}`],
+            [`Date Range: ${format(range.from, 'yyyy-MM-dd')} to ${format(range.to, 'yyyy-MM-dd')}`],
             [],
             ['Summary'],
             ['Total Revenue', 'Total Profit', 'Total Orders', 'Avg Order Value', 'Margin'],
@@ -159,20 +182,30 @@ export default function AnalyticsPage() {
 
     if (loading && !summary) {
         return (
-            <div className="p-8 space-y-6">
-                <div className="flex justify-between items-center">
-                    <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-                    <Skeleton className="h-10 w-[300px]" />
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1">
+                        <Skeleton className="h-7 w-28" />
+                        <Skeleton className="h-3 w-44" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-9 w-[120px]" />
+                        <Skeleton className="h-9 w-9" />
+                    </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-4">
-                    <Skeleton className="h-32" />
-                    <Skeleton className="h-32" />
-                    <Skeleton className="h-32" />
-                    <Skeleton className="h-32" />
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-7">
+                    <Skeleton className="h-[300px] md:col-span-4" />
+                    <Skeleton className="h-[280px] md:col-span-3" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Skeleton className="h-96" />
-                    <Skeleton className="h-96" />
+                    <Skeleton className="h-64" />
+                    <Skeleton className="h-64" />
                 </div>
             </div>
         );
@@ -180,8 +213,8 @@ export default function AnalyticsPage() {
 
     if (error) {
         return (
-            <div className="p-8">
-                <h1 className="text-3xl font-bold mb-4">Analytics Dashboard</h1>
+            <div>
+                <h1 className="text-xl font-bold mb-3">Analytics</h1>
                 <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
                     {error}
                 </div>
@@ -190,71 +223,96 @@ export default function AnalyticsPage() {
     }
 
     return (
-        <div className="p-8 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Overview of your business performance
-                    </p>
+                    <h1 className="text-xl font-bold">Analytics</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Business performance overview</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <DatePickerWithRange date={dateRange} setDate={setDateRange} />
-                    <Button variant="outline" onClick={handleExport}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export
-                    </Button>
-                </div>
+                <Popover open={filterOpen} onOpenChange={handleFilterOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-9 gap-1.5 relative">
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            <span>Filter</span>
+                            {datePreset !== '30d' && (
+                                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+                            )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-52 p-4 space-y-4">
+                        <div className="space-y-1.5">
+                            <p className="text-xs font-semibold">Date Range</p>
+                            <Select value={pendingPreset} onValueChange={setPendingPreset}>
+                                <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="7d">Last 7 days</SelectItem>
+                                    <SelectItem value="30d">Last 30 days</SelectItem>
+                                    <SelectItem value="90d">Last 90 days</SelectItem>
+                                    <SelectItem value="month">This month</SelectItem>
+                                    <SelectItem value="1y">This year</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button size="sm" className="flex-1 h-8" onClick={applyFilter}>
+                                Apply
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-8 px-2" onClick={handleExport} title="Export CSV">
+                                <Download className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    </PopoverContent>
+                </Popover>
             </div>
 
-            {/* Metric Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Metric Cards — 2 cols on mobile, 4 on desktop */}
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
                 <MetricCard
-                    title="Total Revenue"
+                    title="Revenue"
                     value={formatCurrencyWithSettings(summary?.totalRevenue || 0, settings)}
                     icon={DollarSign}
-                    description="Gross revenue in period"
+                    description="Gross revenue"
                 />
                 <MetricCard
-                    title="Total Profit"
+                    title="Profit"
                     value={formatCurrencyWithSettings(summary?.totalProfit || 0, settings)}
                     icon={TrendingUp}
                     description={`Margin: ${summary?.margin.toFixed(1)}%`}
                     trend={{ value: summary?.margin || 0, label: "margin", positive: (summary?.margin || 0) > 20 }}
                 />
                 <MetricCard
-                    title="Total Orders"
+                    title="Orders"
                     value={summary?.totalOrders || 0}
                     icon={ShoppingCart}
-                    description="Completed orders"
+                    description="Completed"
                 />
                 <MetricCard
-                    title="Avg Order Value"
+                    title="Avg Order"
                     value={formatCurrencyWithSettings(summary?.averageOrderValue || 0, settings)}
                     icon={CreditCard}
-                    description="Revenue per order"
+                    description="Per order"
                 />
             </div>
 
+            {/* Charts — stacked on mobile, side-by-side on md+ */}
             <div className="grid gap-4 md:grid-cols-7">
-                {/* Sales Chart */}
                 <div className="md:col-span-4">
                     {salesTrends && (
                         <SalesChart data={salesTrends.data} title="Revenue Trend (Last 7 Days)" />
                     )}
                 </div>
-
-                {/* Category Chart */}
                 <div className="md:col-span-3">
                     <CategoryPieChart data={categories} />
                 </div>
             </div>
 
+            {/* Bottom tables */}
             <div className="grid gap-4 md:grid-cols-2">
-                {/* Top Products */}
                 <TopProductsTable data={topProducts} />
-
-                {/* Low Stock Alerts */}
                 {lowStock && (
                     <div className="h-full">
                         <LowStockTable items={lowStock.items} threshold={lowStock.threshold} />

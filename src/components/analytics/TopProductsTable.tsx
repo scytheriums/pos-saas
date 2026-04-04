@@ -34,12 +34,12 @@ export function TopProductsTable({ data }: TopProductsTableProps) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[50px]">#</TableHead>
+                            <TableHead className="w-[32px]">#</TableHead>
                             <TableHead>Product</TableHead>
                             <TableHead className="text-right">Sales</TableHead>
                             <TableHead className="text-right">Revenue</TableHead>
-                            <TableHead className="text-right">Profit</TableHead>
-                            <TableHead className="text-right">Margin</TableHead>
+                            <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
+                            <TableHead className="text-right hidden sm:table-cell">Margin</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -48,15 +48,15 @@ export function TopProductsTable({ data }: TopProductsTableProps) {
                             return (
                                 <TableRow key={product.id}>
                                     <TableCell className="font-medium">{index + 1}</TableCell>
-                                    <TableCell>{product.name}</TableCell>
+                                    <TableCell className="max-w-[120px] truncate">{product.name}</TableCell>
                                     <TableCell className="text-right">{product.sales}</TableCell>
                                     <TableCell className="text-right">
                                         {formatCurrencyWithSettings(product.revenue, settings)}
                                     </TableCell>
-                                    <TableCell className="text-right text-green-600">
+                                    <TableCell className="text-right text-green-600 hidden sm:table-cell">
                                         {formatCurrencyWithSettings(product.profit, settings)}
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right hidden sm:table-cell">
                                         {margin.toFixed(1)}%
                                     </TableCell>
                                 </TableRow>

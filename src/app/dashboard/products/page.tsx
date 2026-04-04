@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,10 +9,12 @@ import {
     Plus,
     Search,
     Package,
+    PackageCheck,
+    PackageX,
     AlertTriangle,
     Edit,
     Trash2,
-    Filter,
+    SlidersHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -29,6 +31,12 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDebounce } from '@/hooks/use-debounce';
 
 interface Product {
@@ -58,6 +66,33 @@ export default function ProductsPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
+
+    // Filter popup state
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [pendingSearch, setPendingSearch] = useState('');
+    const [stockFilter, setStockFilter] = useState('ALL');
+    const [pendingStockFilter, setPendingStockFilter] = useState('ALL');
+
+    const activeFilterCount = [stockFilter !== 'ALL'].filter(Boolean).length;
+
+    const handleFilterOpen = (open: boolean) => {
+        if (open) {
+            setPendingSearch(searchQuery);
+            setPendingStockFilter(stockFilter);
+        }
+        setFilterOpen(open);
+    };
+
+    const applyFilters = () => {
+        setSearchQuery(pendingSearch);
+        setStockFilter(pendingStockFilter);
+        setFilterOpen(false);
+    };
+
+    const resetFilters = () => {
+        setPendingSearch('');
+        setPendingStockFilter('ALL');
+    };
 
     const fetchProducts = async (pageNumber: number, search: string, reset: boolean = false) => {
         try {
@@ -127,7 +162,12 @@ export default function ProductsPage() {
         }
     };
 
-    const filteredProducts = products;
+    const filteredProducts = products.filter(p => {
+        if (stockFilter === 'IN_STOCK') return getTotalStock(p) > p.minStock;
+        if (stockFilter === 'LOW_STOCK') return getTotalStock(p) <= p.minStock && getTotalStock(p) > 0;
+        if (stockFilter === 'OUT_OF_STOCK') return getTotalStock(p) === 0;
+        return true;
+    });
 
     const getTotalStock = (product: Product) => {
         return product.variants.reduce((sum, v) => sum + v.stock, 0);
@@ -142,15 +182,23 @@ export default function ProductsPage() {
 
     if (loading && products.length === 0) {
         return (
-            <div className="p-8 space-y-6">
-                <div className="flex items-center justify-between">
-                    <Skeleton className="h-10 w-48" />
-                    <Skeleton className="h-10 w-32" />
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1">
+                        <Skeleton className="h-7 w-28" />
+                        <Skeleton className="h-3 w-48" />
+                    </div>
+                    <div className="flex gap-2">
+                        <Skeleton className="h-9 w-24" />
+                        <Skeleton className="h-9 w-24" />
+                    </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
-                        <Skeleton key={i} className="h-48" />
-                    ))}
+                <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+                    <Skeleton className="h-12" /><Skeleton className="h-12" />
+                    <Skeleton className="h-12" /><Skeleton className="h-12" />
+                </div>
+                <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-36" />)}
                 </div>
             </div>
         );
@@ -158,8 +206,9 @@ export default function ProductsPage() {
 
     if (error) {
         return (
-            <div className="p-8">
-                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
+            <div>
+                <h1 className="text-xl font-bold mb-3">Products</h1>
+                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded text-sm">
                     {error}
                 </div>
             </div>
@@ -174,209 +223,213 @@ export default function ProductsPage() {
     };
 
     return (
-        <div className="p-8 space-y-6">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold">Products</h1>
-                    <p className="text-muted-foreground">Manage your inventory and product catalog</p>
+                    <h1 className="text-xl font-bold">Products</h1>
+                    <p className="text-xs text-muted-foreground">Manage your product catalog</p>
                 </div>
-                <Link href="/dashboard/products/new">
-                    <Button>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Product
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Popover open={filterOpen} onOpenChange={handleFilterOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 gap-1.5 relative">
+                                <SlidersHorizontal className="h-3.5 w-3.5" />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-bold">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-60 p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold">Filters</p>
+                                <button onClick={resetFilters} className="text-xs text-muted-foreground hover:text-foreground">Reset</button>
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Search</p>
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Name or SKU..."
+                                        value={pendingSearch}
+                                        onChange={(e) => setPendingSearch(e.target.value)}
+                                        className="pl-7 h-8 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Stock Status</p>
+                                <Select value={pendingStockFilter} onValueChange={setPendingStockFilter}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">All</SelectItem>
+                                        <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                                        <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
+                                        <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button size="sm" className="w-full h-8" onClick={applyFilters}>Apply</Button>
+                        </PopoverContent>
+                    </Popover>
+                    <Link href="/dashboard/products/new">
+                        <Button size="sm" className="h-9 gap-1.5">
+                            <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{total}</div>
-                        <p className="text-xs text-muted-foreground">Total across all pages</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">In Stock</CardTitle>
-                        <Package className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">
-                            {stats.total - stats.lowStock - stats.outOfStock}
+            <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Package className="h-[18px] w-[18px] text-primary" />
                         </div>
-                        <p className="text-xs text-muted-foreground">Visible items</p>
-                    </CardContent>
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">Total Products</p>
+                            <p className="text-lg font-bold leading-none mt-1">{total}</p>
+                        </div>
+                    </div>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-orange-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-orange-600">{stats.lowStock}</div>
-                        <p className="text-xs text-muted-foreground">Need restocking</p>
-                    </CardContent>
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="h-9 w-9 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+                            <PackageCheck className="h-[18px] w-[18px] text-green-600" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">In Stock</p>
+                            <p className="text-lg font-bold leading-none mt-1 text-green-600">
+                                {products.filter(p => getTotalStock(p) > p.minStock).length}
+                            </p>
+                        </div>
+                    </div>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-red-600">{stats.outOfStock}</div>
-                        <p className="text-xs text-muted-foreground">Urgent</p>
-                    </CardContent>
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="h-9 w-9 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="h-[18px] w-[18px] text-orange-600" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">Low Stock</p>
+                            <p className="text-lg font-bold leading-none mt-1 text-orange-600">
+                                {products.filter(p => getTotalStock(p) <= p.minStock && getTotalStock(p) > 0).length}
+                            </p>
+                        </div>
+                    </div>
                 </Card>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="flex gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search products by name or SKU..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-                <Button variant="outline">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filters
-                </Button>
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="h-9 w-9 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                            <PackageX className="h-[18px] w-[18px] text-red-600" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">Out of Stock</p>
+                            <p className="text-lg font-bold leading-none mt-1 text-red-600">
+                                {products.filter(p => getTotalStock(p) === 0).length}
+                            </p>
+                        </div>
+                    </div>
+                </Card>
             </div>
 
             {/* Products Grid */}
             {filteredProducts.length === 0 && !loading ? (
                 <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <Package className="h-16 w-16 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">
-                            {searchQuery ? 'No products found' : 'No products yet'}
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                        <Package className="h-12 w-12 text-muted-foreground mb-3" />
+                        <h3 className="text-base font-semibold mb-1">
+                            {searchQuery || stockFilter !== 'ALL' ? 'No products found' : 'No products yet'}
                         </h3>
-                        <p className="text-muted-foreground mb-4">
-                            {searchQuery
-                                ? 'Try adjusting your search query'
+                        <p className="text-sm text-muted-foreground mb-4">
+                            {searchQuery || stockFilter !== 'ALL'
+                                ? 'Try adjusting your search or filter'
                                 : 'Get started by adding your first product'}
                         </p>
-                        {!searchQuery && (
+                        {!searchQuery && stockFilter === 'ALL' && (
                             <Link href="/dashboard/products/new">
-                                <Button>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add Product
-                                </Button>
+                                <Button size="sm"><Plus className="mr-1.5 h-3.5 w-3.5" />Add Product</Button>
                             </Link>
                         )}
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div className="grid gap-2 lg:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {filteredProducts.map((product) => {
                         const stockStatus = getStockStatus(product);
                         const totalStock = getTotalStock(product);
                         return (
-                            <Card key={product.id} className="hover:shadow-lg transition-shadow overflow-hidden">
-                                {/* Product Image - Always show for consistency */}
-                                <div className="aspect-square w-full bg-gray-100 flex items-center justify-center overflow-hidden relative">
+                            <Card key={product.id} className="overflow-hidden hover:shadow-md transition-shadow p-0 pb-2 gap-2">
+                                {/* Image: fixed compact height on mobile/tablet, aspect-square on desktop */}
+                                <div className="aspect-square h-auto w-full bg-muted flex items-center justify-center overflow-hidden relative">
                                     {product.imageUrl ? (
                                         <Image
                                             src={product.imageUrl}
                                             alt={product.name}
                                             fill
                                             className="object-cover"
-                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                         />
                                     ) : (
-                                        <Package className="w-12 h-12 text-gray-300" />
+                                        <Package className="w-8 h-8 lg:w-10 lg:h-10 text-muted-foreground/30" />
                                     )}
                                 </div>
-                                <CardHeader className="p-3 pb-2">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <CardTitle className="text-base">{product.name}</CardTitle>
-                                            {product.description && (
-                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                                    {product.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <Badge variant={stockStatus.variant} className="text-[10px] px-1.5 py-0.5">{stockStatus.label}</Badge>
+                                <CardContent className="p-2 lg:p-2.5 space-y-1 lg:space-y-1.5">
+                                    <div className="flex items-start justify-between gap-1">
+                                        <p className="font-semibold text-xs lg:text-sm leading-tight line-clamp-2 flex-1">{product.name}</p>
+                                        <Badge variant={stockStatus.variant} className="text-[9px] px-1 py-0 shrink-0 leading-tight">{stockStatus.label}</Badge>
                                     </div>
-                                </CardHeader>
-                                <CardContent className="p-3 pt-1">
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">Variants</span>
-                                            <span className="font-medium">{product.variants.length}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">Total Stock</span>
-                                            <span
-                                                className={`font-medium ${totalStock === 0
-                                                    ? 'text-red-600'
-                                                    : totalStock <= product.minStock
-                                                        ? 'text-orange-600'
-                                                        : 'text-green-600'
-                                                    }`}
-                                            >
-                                                {totalStock} units
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">Price Range</span>
-                                            <span className="font-medium">
-                                                {product.variants.length === 1
-                                                    ? formatCurrency(product.variants[0].price)
-                                                    : `${formatCurrency(
-                                                        Math.min(...product.variants.map((v) => v.price))
-                                                    )} - ${formatCurrency(
-                                                        Math.max(...product.variants.map((v) => v.price))
-                                                    )}`}
-                                            </span>
-                                        </div>
-                                        <div className="flex gap-2 pt-2">
-                                            <Link href={`/dashboard/products/${product.id}/edit`} className="flex-1">
-                                                <Button variant="outline" size="sm" className="w-full h-8 text-xs">
-                                                    <Edit className="mr-2 h-3 w-3" />
-                                                    Edit
+                                    <div className="text-[11px] lg:text-xs text-muted-foreground flex justify-between">
+                                        <span>
+                                            {product.variants.length === 1
+                                                ? formatCurrency(product.variants[0].price)
+                                                : `${formatCurrency(Math.min(...product.variants.map(v => v.price)))}+`}
+                                        </span>
+                                        <span className={
+                                            totalStock === 0 ? 'text-red-600 font-medium' :
+                                            totalStock <= product.minStock ? 'text-orange-600 font-medium' :
+                                            'text-green-600'
+                                        }>
+                                            {totalStock} unit
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-1 lg:gap-1.5">
+                                        <Link href={`/dashboard/products/${product.id}/edit`} className="flex-1">
+                                            <Button variant="outline" size="sm" className="w-full h-6 lg:h-7 text-[11px] lg:text-xs px-1.5 lg:px-2">
+                                                <Edit className="h-2.5 w-2.5 lg:h-3 lg:w-3 mr-1" />Edit
+                                            </Button>
+                                        </Link>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground h-6 w-6 lg:h-7 lg:w-7 p-0 shrink-0"
+                                                    disabled={deletingId === product.id}
+                                                >
+                                                    <Trash2 className="h-2.5 w-2.5 lg:h-3 lg:w-3" />
                                                 </Button>
-                                            </Link>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground h-8 w-8 p-0"
-                                                        disabled={deletingId === product.id}
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Delete Product?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Are you sure you want to delete "{product.name}"? This action cannot be undone.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction
-                                                            onClick={() => handleDelete(product.id)}
-                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                                        >
-                                                            Delete
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Product?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Are you sure you want to delete &quot;{product.name}&quot;? This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={() => handleDelete(product.id)}
+                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                    >Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -385,10 +438,10 @@ export default function ProductsPage() {
                 </div>
             )}
 
-            {/* Load More Button */}
+            {/* Load More */}
             {products.length < total && (
-                <div className="flex justify-center mt-6">
-                    <Button onClick={loadMore} disabled={loading}>
+                <div className="flex justify-center">
+                    <Button variant="outline" size="sm" onClick={loadMore} disabled={loading}>
                         {loading ? 'Loading...' : 'Load More'}
                     </Button>
                 </div>

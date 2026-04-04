@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { formatCurrencyWithSettings } from "@/lib/format";
 import { useTenantSettings } from "@/contexts/SettingsContext";
 
@@ -15,40 +14,46 @@ interface CategoryPieChartProps {
     data: CategoryStat[];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export function CategoryPieChart({ data }: CategoryPieChartProps) {
     const settings = useTenantSettings();
+    const total = data.reduce((sum, d) => sum + d.value, 0);
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Sales by Category</CardTitle>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-base">Sales by Category</CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={data}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                            >
-                                {data.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip
-                                formatter={(value: number) => formatCurrencyWithSettings(value, settings)}
-                            />
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
+            <CardContent className="space-y-3">
+                {data.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No category data available</p>
+                ) : (
+                    data.map((item, i) => {
+                        const pct = total > 0 ? (item.value / total) * 100 : 0;
+                        const color = COLORS[i % COLORS.length];
+                        return (
+                            <div key={item.name} className="space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                                        <span className="truncate text-foreground">{item.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                                        <span className="text-muted-foreground">{formatCurrencyWithSettings(item.value, settings)}</span>
+                                        <span className="font-semibold w-10 text-right">{pct.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full transition-all duration-500"
+                                        style={{ width: `${pct}%`, background: color }}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
             </CardContent>
         </Card>
     );

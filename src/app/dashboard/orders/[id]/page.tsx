@@ -151,7 +151,7 @@ export default function OrderDetailsPage() {
 
     return (
         <>
-            <div className="print:hidden p-6 space-y-6">
+            <div className="print:hidden p-3 md:p-6 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -161,19 +161,19 @@ export default function OrderDetailsPage() {
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-3xl font-bold">Order Details</h1>
+                            <h1 className="text-xl font-bold">Order Details</h1>
                             <p className="text-muted-foreground">Order ID: {order.id}</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={handlePrint}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Reprint Receipt
+                        <Button variant="outline" onClick={handlePrint} size="sm">
+                            <Printer className="h-4 w-4" />
+                            <span className="hidden sm:inline ml-2">Reprint Receipt</span>
                         </Button>
                     </div>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-3">
                     {/* Order Information */}
                     <Card className="md:col-span-2">
                         <CardHeader>
@@ -257,7 +257,7 @@ export default function OrderDetailsPage() {
                     <CardContent>
                         <div className="space-y-4">
                             {order.items.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-0">
+                                <div key={item.id} className="flex items-center justify-between py-2 border-b last:border-0">
                                     <div className="flex-1">
                                         <p className="font-medium">{item.variant.product.name}</p>
                                         <p className="text-sm text-muted-foreground">SKU: {item.variant.sku}</p>
@@ -266,7 +266,7 @@ export default function OrderDetailsPage() {
                                         <p className="font-medium">{formatCurrencyWithSettings(Number(item.price), settings)}</p>
                                         <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                                     </div>
-                                    <div className="ml-8 text-right min-w-[120px]">
+                                    <div className="ml-4 text-right min-w-[80px]">
                                         <p className="font-bold">{formatCurrencyWithSettings(Number(item.price) * item.quantity, settings)}</p>
                                     </div>
                                 </div>

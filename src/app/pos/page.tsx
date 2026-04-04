@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Menu, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, X, Bluetooth, BluetoothOff, Loader2, Download } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,34 +68,7 @@ export default function POSPage() {
     const { t, language, setLanguage } = useLanguage();
     const settings = useTenantSettings();
 
-    // Capture PWA install prompt (may have fired before this component mounted)
-    useEffect(() => {
-        const sync = () => {
-            if ((window as any).__pwaPrompt) setPwaPrompt((window as any).__pwaPrompt);
-        };
-        sync(); // already captured?
-        window.addEventListener('pwaPromptReady', sync);
-        window.addEventListener('beforeinstallprompt', (e: Event) => {
-            e.preventDefault();
-            (window as any).__pwaPrompt = e;
-            setPwaPrompt(e);
-        });
-        return () => window.removeEventListener('pwaPromptReady', sync);
-    }, []);
-
-    // Track whether app is already installed (standalone mode) or just got installed
-    const [isInstalled, setIsInstalled] = useState(false);
-    const [showInstallGuide, setShowInstallGuide] = useState(false);
-    useEffect(() => {
-        const mq = window.matchMedia('(display-mode: standalone)');
-        setIsInstalled(mq.matches);
-        const onChange = (e: MediaQueryListEvent) => setIsInstalled(e.matches);
-        mq.addEventListener('change', onChange);
-        window.addEventListener('appinstalled', () => setIsInstalled(true));
-        return () => mq.removeEventListener('change', onChange);
-    }, []);
     const { isConnected: btConnected, isConnecting: btConnecting, deviceName: btDeviceName, connect: btConnect, disconnect: btDisconnect, printReceipt } = usePrinter();
-    const [pwaPrompt, setPwaPrompt] = useState<any>(null);
     const { data: session } = authClient.useSession();
     const isOwner = (session?.user as AuthUser | undefined)?.role === 'owner';
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -728,8 +701,9 @@ export default function POSPage() {
                 {/* ── Header ── */}
                 <header className="bg-white border-b px-2 md:px-4 lg:px-6 py-2 md:py-3 flex items-center justify-between shrink-0 h-12 md:h-14 lg:h-16">
                     <div className="flex items-center gap-1.5 md:gap-3 min-w-0">
-                        <Link href="/dashboard/analytics" className="p-1 md:p-1.5 bg-primary/10 rounded-lg shrink-0 xl:hidden">
-                            <Menu className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                        {/* Back to dashboard: visible on mobile/tablet where sidebar is hidden */}
+                        <Link href="/dashboard/analytics" className="p-1.5 rounded-xl text-gray-500 hover:bg-gray-100 shrink-0 lg:hidden transition-colors">
+                            <ChevronLeft className="w-5 h-5" />
                         </Link>
                         <h1 className="text-sm md:text-base lg:text-xl font-bold text-gray-800 truncate">{tenant?.name || 'Awan POS'}</h1>
                         <OfflineIndicator />
@@ -768,67 +742,6 @@ export default function POSPage() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                             )}
                         </button>
-                        {/* PWA Install button — always visible unless app is already installed */}
-                        {!isInstalled && (
-                            <>
-                                <button
-                                    className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold hover:bg-purple-100 transition-colors"
-                                    title="Install App"
-                                    onClick={async () => {
-                                        if (pwaPrompt) {
-                                            pwaPrompt.prompt();
-                                            const { outcome } = await pwaPrompt.userChoice;
-                                            if (outcome === 'accepted') {
-                                                setPwaPrompt(null);
-                                                (window as any).__pwaPrompt = null;
-                                            }
-                                        } else {
-                                            setShowInstallGuide(true);
-                                        }
-                                    }}
-                                >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">Install</span>
-                                </button>
-                                {/* Fallback install instructions modal */}
-                                {showInstallGuide && (
-                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowInstallGuide(false)}>
-                                        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h2 className="font-bold text-gray-900 text-base">Install Awan POS</h2>
-                                                <button className="text-gray-400 hover:text-gray-600" onClick={() => setShowInstallGuide(false)}><X className="w-5 h-5" /></button>
-                                            </div>
-                                            <div className="space-y-4 text-sm text-gray-700">
-                                                <div>
-                                                    <p className="font-semibold text-gray-900 mb-1">Chrome (Desktop)</p>
-                                                    <ol className="list-decimal list-inside space-y-1">
-                                                        <li>Click the <span className="font-mono bg-gray-100 px-1 rounded">&#8942;</span> menu (top-right)</li>
-                                                        <li>Select <strong>"Cast, save, and share"</strong></li>
-                                                        <li>Click <strong>"Install page as app..."</strong></li>
-                                                    </ol>
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-900 mb-1">Chrome (Android)</p>
-                                                    <ol className="list-decimal list-inside space-y-1">
-                                                        <li>Tap the <span className="font-mono bg-gray-100 px-1 rounded">&#8942;</span> menu</li>
-                                                        <li>Tap <strong>"Add to Home screen"</strong></li>
-                                                        <li>Tap <strong>"Add"</strong> to confirm</li>
-                                                    </ol>
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-900 mb-1">Safari (iPhone / iPad)</p>
-                                                    <ol className="list-decimal list-inside space-y-1">
-                                                        <li>Tap the <strong>Share</strong> button (box with arrow)</li>
-                                                        <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
-                                                        <li>Tap <strong>"Add"</strong></li>
-                                                    </ol>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
                         {/* Language toggle */}
                         <button
                             className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"
@@ -848,7 +761,7 @@ export default function POSPage() {
                 <div className="flex-1 flex overflow-hidden relative">
 
                     {/* Left: Product Grid */}
-                    <div className="flex-1 flex flex-col p-2 md:p-3 lg:p-5 gap-2 md:gap-3 lg:gap-4 overflow-hidden min-w-0">
+                    <div className="flex-1 flex flex-col p-5 gap-4 overflow-hidden min-w-0">
                         {/* Search */}
                         <div className="relative shrink-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -870,7 +783,7 @@ export default function POSPage() {
 
                         {/* Product count badge */}
                         {!loading && products.length > 0 && (
-                            <p className="text-xs text-gray-400 -mt-1 pl-1 shrink-0">{products.length} products</p>
+                            <p className="text-xs text-gray-400 -mt-1 pl-1 shrink-0 text-end">{products.length} products</p>
                         )}
 
                         {/* Products Grid */}
@@ -894,7 +807,7 @@ export default function POSPage() {
                                         return (
                                             <Card
                                                 key={product.id}
-                                                className="cursor-pointer hover:shadow-md active:scale-[0.97] transition-all duration-150 border-gray-100 group overflow-hidden select-none"
+                                                className="cursor-pointer hover:shadow-md active:scale-[0.97] transition-all duration-150 border-gray-100 group overflow-hidden select-none py-0 pb-2 gap-0"
                                                 onClick={() => handleProductClick(product)}
                                             >
                                                 <div className="aspect-square bg-gray-100 relative overflow-hidden">

@@ -5,14 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { VariantMatrixEditor } from '@/components/products/VariantMatrixEditor';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { ProductBasicInfoCard } from '@/components/products/ProductBasicInfoCard';
 
 interface VariantData {
     id: string;
@@ -41,36 +39,10 @@ export default function NewProductPage() {
     const [minStock, setMinStock] = useState(10);
     const [categoryId, setCategoryId] = useState<string>('');
 
-    // Categories
-    const [categories, setCategories] = useState<any[]>([]);
-
     // SKU Settings
     const [skuSettings, setSkuSettings] = useState<{ autoGenerateSku: boolean; preview: string } | null>(null);
 
-    // Fetch categories
     useEffect(() => {
-        async function fetchCategories() {
-            try {
-                const res = await fetch('/api/categories');
-                if (res.ok) {
-                    const data = await res.json();
-                    // Flatten tree for dropdown
-                    const flatten = (cats: any[], level = 0): any[] => {
-                        return cats.reduce((acc, cat) => {
-                            acc.push({ ...cat, level });
-                            if (cat.children?.length > 0) {
-                                acc.push(...flatten(cat.children, level + 1));
-                            }
-                            return acc;
-                        }, []);
-                    };
-                    setCategories(flatten(data));
-                }
-            } catch (error) {
-                console.error('Failed to fetch categories:', error);
-            }
-        }
-        fetchCategories();
         fetchSkuSettings();
     }, []);
 
@@ -160,88 +132,36 @@ export default function NewProductPage() {
     };
 
     return (
-        <div className="p-8 space-y-6">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <h1 className="text-xl font-bold">Create New Product</h1>
+                    <p className="text-xs text-muted-foreground">Add a new product to your inventory</p>
+                </div>
                 <Link href="/dashboard/products">
-                    <Button variant="ghost" size="sm">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground">
+                        <ArrowLeft className="h-3.5 w-3.5" />
                         Back
                     </Button>
                 </Link>
-                <div>
-                    <h1 className="text-3xl font-bold">Create New Product</h1>
-                    <p className="text-muted-foreground">Add a new product to your inventory</p>
-                </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Basic Information */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Basic Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Product Name *</Label>
-                            <Input
-                                id="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g., Cotton T-Shirt"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Product description..."
-                                rows={3}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Product Image</Label>
-                            <ImageUpload
-                                value={imageUrl || undefined}
-                                onChange={(url) => setImageUrl(url)}
-                                type="product"
-                                disabled={loading}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="category">Category (Optional)</Label>
-                            <Select value={categoryId} onValueChange={setCategoryId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__none__">No Category</SelectItem>
-                                    {categories.map(cat => (
-                                        <SelectItem key={cat.id} value={cat.id}>
-                                            {'  '.repeat(cat.level)}└─ {cat.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="minStock">Minimum Stock Threshold</Label>
-                            <Input
-                                id="minStock"
-                                type="number"
-                                value={minStock}
-                                onChange={(e) => setMinStock(parseInt(e.target.value))}
-                                min={0}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                You'll be alerted when stock falls below this level
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+                <ProductBasicInfoCard
+                    name={name}
+                    description={description}
+                    imageUrl={imageUrl}
+                    minStock={minStock}
+                    categoryId={categoryId}
+                    disabled={loading}
+                    onNameChange={setName}
+                    onDescriptionChange={setDescription}
+                    onImageChange={setImageUrl}
+                    onMinStockChange={setMinStock}
+                    onCategoryChange={setCategoryId}
+                />
 
                 {/* Variant Toggle */}
                 <Card>
@@ -272,8 +192,8 @@ export default function NewProductPage() {
                             <CardTitle>Product Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="sku">SKU {!skuSettings?.autoGenerateSku && '*'}</Label>
                                     <Input
                                         id="sku"
@@ -288,7 +208,7 @@ export default function NewProductPage() {
                                         <p className="text-xs text-muted-foreground">✨ Auto-generated</p>
                                     )}
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="stock">Initial Stock *</Label>
                                     <Input
                                         id="stock"
@@ -300,8 +220,8 @@ export default function NewProductPage() {
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="price">Price (Rp) *</Label>
                                     <Input
                                         id="price"
@@ -313,7 +233,7 @@ export default function NewProductPage() {
                                         required
                                     />
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="cost">Cost (Rp)</Label>
                                     <Input
                                         id="cost"
@@ -349,14 +269,14 @@ export default function NewProductPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex justify-end gap-4">
+                <div className="flex justify-end gap-2">
                     <Link href="/dashboard/products">
-                        <Button type="button" variant="outline" disabled={loading}>
+                        <Button type="button" variant="outline" size="sm" disabled={loading}>
                             Cancel
                         </Button>
                     </Link>
-                    <Button type="submit" disabled={loading}>
-                        <Save className="mr-2 h-4 w-4" />
+                    <Button type="submit" size="sm" disabled={loading}>
+                        <Save className="mr-1.5 h-3.5 w-3.5" />
                         {loading ? 'Creating...' : 'Create Product'}
                     </Button>
                 </div>

@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, Trash2, Edit, Check, X } from 'lucide-react';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ProductBasicInfoCard } from '@/components/products/ProductBasicInfoCard';
+import { VariantMatrixEditor } from '@/components/products/VariantMatrixEditor';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,10 +21,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CostHistoryTab from "@/components/products/CostHistoryTab";
-import { ImageUpload } from '@/components/ui/image-upload';
 
-interface Variant {
+interface VariantState {
     id: string;
+    optionValueIds: string[];
     sku: string;
     price: number;
     cost: number;
@@ -35,113 +32,10 @@ interface Variant {
     imageUrl?: string | null;
 }
 
-// Variant Edit Row Component
-function VariantEditRow({ variant, productId, onUpdate }: { variant: Variant; productId: string; onUpdate: () => void }) {
-    const [editing, setEditing] = useState(false);
-    const [sku, setSku] = useState(variant.sku);
-    const [price, setPrice] = useState(variant.price);
-    const [cost, setCost] = useState(variant.cost);
-    const [stock, setStock] = useState(variant.stock);
-    const [imageUrl, setImageUrl] = useState(variant.imageUrl);
-    const [saving, setSaving] = useState(false);
-
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            const response = await fetch(`/api/products/${productId}/variants/${variant.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku, price, cost, stock, imageUrl })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update variant');
-            }
-
-            setEditing(false);
-            onUpdate();
-        } catch (error) {
-            console.error('Error updating variant:', error);
-            alert('Failed to update variant');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleCancel = () => {
-        setSku(variant.sku);
-        setPrice(variant.price);
-        setCost(variant.cost);
-        setStock(variant.stock);
-        setImageUrl(variant.imageUrl);
-        setEditing(false);
-    };
-
-    if (editing) {
-        return (
-            <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
-                <Input
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    placeholder="SKU"
-                    className="flex-1"
-                />
-                <Input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(parseFloat(e.target.value))}
-                    placeholder="Price"
-                    className="w-28"
-                />
-                <Input
-                    type="number"
-                    value={cost}
-                    onChange={(e) => setCost(parseFloat(e.target.value))}
-                    placeholder="Cost"
-                    className="w-28"
-                />
-                <Input
-                    type="number"
-                    value={stock}
-                    onChange={(e) => setStock(parseInt(e.target.value))}
-                    placeholder="Stock"
-                    className="w-24"
-                />
-                <div className="w-10 h-10 shrink-0">
-                    <ImageUpload
-                        value={imageUrl || undefined}
-                        onChange={(url) => setImageUrl(url)}
-                        type="product"
-                        disabled={saving}
-                        minimal
-                    />
-                </div>
-                <Button size="sm" onClick={handleSave} disabled={saving}>
-                    <Check className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCancel} disabled={saving}>
-                    <X className="h-4 w-4" />
-                </Button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-            <div className="flex-1">
-                <p className="font-medium">{variant.sku}</p>
-                <p className="text-sm text-muted-foreground">
-                    Stock: {variant.stock} units | Cost: Rp {variant.cost.toLocaleString()}
-                </p>
-            </div>
-            <div className="flex items-center gap-3">
-                <p className="font-semibold">Rp {variant.price.toLocaleString()}</p>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
-                    <Edit className="h-4 w-4" />
-                </Button>
-            </div>
-        </div>
-    );
+interface OptionState {
+    id: string;
+    name: string;
+    values: { id: string; value: string }[];
 }
 
 interface Product {
@@ -150,12 +44,17 @@ interface Product {
     description: string | null;
     imageUrl: string | null;
     minStock: number;
+    categoryId: string | null;
+    hasVariants: boolean;
+    options: OptionState[];
     variants: Array<{
         id: string;
         sku: string;
         price: number;
         cost: number;
         stock: number;
+        imageUrl?: string | null;
+        optionValues: Array<{ id: string; value: string }>;
     }>;
 }
 
@@ -176,33 +75,9 @@ export default function EditProductPage() {
     const [minStock, setMinStock] = useState(10);
     const [categoryId, setCategoryId] = useState<string>('');
 
-    // Categories
-    const [categories, setCategories] = useState<any[]>([]);
-
-    // Fetch categories
-    useEffect(() => {
-        async function fetchCategories() {
-            try {
-                const res = await fetch('/api/categories');
-                if (res.ok) {
-                    const data = await res.json();
-                    const flatten = (cats: any[], level = 0): any[] => {
-                        return cats.reduce((acc, cat) => {
-                            acc.push({ ...cat, level });
-                            if (cat.children?.length > 0) {
-                                acc.push(...flatten(cat.children, level + 1));
-                            }
-                            return acc;
-                        }, []);
-                    };
-                    setCategories(flatten(data));
-                }
-            } catch (error) {
-                console.error('Failed to fetch categories:', error);
-            }
-        }
-        fetchCategories();
-    }, []);
+    // Variant state (mirrors VariantMatrixEditor format)
+    const [options, setOptions] = useState<OptionState[]>([]);
+    const [variants, setVariants] = useState<VariantState[]>([]);
 
     useEffect(() => {
         fetchProduct();
@@ -221,6 +96,24 @@ export default function EditProductPage() {
             setImageUrl(data.imageUrl || null);
             setMinStock(data.minStock);
             setCategoryId(data.categoryId || '__none__');
+
+            // Map API options to VariantMatrixEditor format
+            setOptions((data.options ?? []).map((opt: any) => ({
+                id: opt.id,
+                name: opt.name,
+                values: (opt.values ?? []).map((v: any) => ({ id: v.id, value: v.value }))
+            })));
+
+            // Map API variants to VariantMatrixEditor format
+            setVariants((data.variants ?? []).map((v: any) => ({
+                id: v.id,
+                optionValueIds: (v.optionValues ?? []).map((ov: any) => ov.id),
+                sku: v.sku,
+                price: Number(v.price),
+                cost: Number(v.cost),
+                stock: v.stock,
+                imageUrl: v.imageUrl ?? null
+            })));
         } catch (err: any) {
             setError(err.message || 'Failed to load product');
         } finally {
@@ -234,7 +127,8 @@ export default function EditProductPage() {
         setError(null);
 
         try {
-            const response = await fetch(`/api/products/${productId}`, {
+            // 1. Save base product info
+            const productRes = await fetch(`/api/products/${productId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -246,9 +140,29 @@ export default function EditProductPage() {
                 })
             });
 
-            if (!response.ok) {
-                const data = await response.json();
+            if (!productRes.ok) {
+                const data = await productRes.json();
                 throw new Error(data.error || 'Failed to update product');
+            }
+
+            // 2. Save each variant
+            for (const variant of variants) {
+                const variantRes = await fetch(`/api/products/${productId}/variants/${variant.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sku: variant.sku,
+                        price: variant.price,
+                        cost: variant.cost,
+                        stock: variant.stock,
+                        imageUrl: variant.imageUrl
+                    })
+                });
+
+                if (!variantRes.ok) {
+                    const data = await variantRes.json();
+                    throw new Error(data.error || `Failed to update variant ${variant.sku}`);
+                }
             }
 
             router.push('/dashboard/products');
@@ -282,22 +196,22 @@ export default function EditProductPage() {
 
     if (loading) {
         return (
-            <div className="p-8 space-y-6">
-                <Skeleton className="h-10 w-64" />
-                <Skeleton className="h-96" />
+            <div className="space-y-4">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-80" />
             </div>
         );
     }
 
     if (error && !product) {
         return (
-            <div className="p-8">
-                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
+            <div className="space-y-3">
+                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded text-sm">
                     {error}
                 </div>
-                <Link href="/dashboard/products" className="mt-4 inline-block">
-                    <Button variant="outline">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
+                <Link href="/dashboard/products" className="inline-block">
+                    <Button variant="outline" size="sm">
+                        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                         Back to Products
                     </Button>
                 </Link>
@@ -306,138 +220,78 @@ export default function EditProductPage() {
     }
 
     return (
-        <div className="p-8 space-y-6">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-2">
+                <div>
+                    <h1 className="text-xl font-bold">Edit Product</h1>
+                    <p className="text-xs text-muted-foreground">Update product information</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 gap-1.5 text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground" disabled={deleting}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete &quot;{product?.name}&quot; and all its variants.
+                                    This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                     <Link href="/dashboard/products">
-                        <Button variant="ghost" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
+                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground">
+                            <ArrowLeft className="h-3.5 w-3.5" />
                             Back
                         </Button>
                     </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold">Edit Product</h1>
-                        <p className="text-muted-foreground">Update product information</p>
-                    </div>
                 </div>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={deleting}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Product
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This will permanently delete "{product?.name}" and all its variants.
-                                This action cannot be undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Delete
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
             </div>
 
-            <Tabs defaultValue="details" className="space-y-6">
+            <Tabs defaultValue="details" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="details">Product Details</TabsTrigger>
                     <TabsTrigger value="cost-history">Cost History</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="details" className="space-y-6">
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                <TabsContent value="details" className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Basic Information */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Basic Information</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Product Name *</Label>
-                                    <Input
-                                        id="name"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
-                                    <Textarea
-                                        id="description"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Product Image</Label>
-                                    <ImageUpload
-                                        value={imageUrl || undefined}
-                                        onChange={(url) => setImageUrl(url)}
-                                        type="product"
-                                        disabled={saving}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="category">Category (Optional)</Label>
-                                    <Select value={categoryId} onValueChange={setCategoryId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a category" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">No Category</SelectItem>
-                                            {categories.map(cat => (
-                                                <SelectItem key={cat.id} value={cat.id}>
-                                                    {'  '.repeat(cat.level)}└─ {cat.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="minStock">Minimum Stock Threshold</Label>
-                                    <Input
-                                        id="minStock"
-                                        type="number"
-                                        value={minStock}
-                                        onChange={(e) => setMinStock(parseInt(e.target.value))}
-                                        min={0}
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        You'll be alerted when stock falls below this level
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <ProductBasicInfoCard
+                            name={name}
+                            description={description}
+                            imageUrl={imageUrl}
+                            minStock={minStock}
+                            categoryId={categoryId}
+                            disabled={saving}
+                            onNameChange={setName}
+                            onDescriptionChange={setDescription}
+                            onImageChange={setImageUrl}
+                            onMinStockChange={setMinStock}
+                            onCategoryChange={setCategoryId}
+                        />
 
-                        {/* Variants Information (Editable) */}
-                        {product && product.variants.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Variants ({product.variants.length})</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {product.variants.map((variant, index) => (
-                                            <VariantEditRow
-                                                key={variant.id}
-                                                variant={variant}
-                                                productId={productId}
-                                                onUpdate={fetchProduct}
-                                            />
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
+                        {/* Variants */}
+                        {variants.length > 0 && (
+                            <VariantMatrixEditor
+                                options={options}
+                                variants={variants}
+                                onOptionsChange={setOptions}
+                                onVariantsChange={setVariants}
+                                hideOptions
+                            />
                         )}
 
                         {/* Error Message */}
@@ -448,14 +302,14 @@ export default function EditProductPage() {
                         )}
 
                         {/* Actions */}
-                        <div className="flex justify-end gap-4">
+                        <div className="flex justify-end gap-2">
                             <Link href="/dashboard/products">
-                                <Button type="button" variant="outline" disabled={saving}>
+                                <Button type="button" variant="outline" size="sm" disabled={saving}>
                                     Cancel
                                 </Button>
                             </Link>
-                            <Button type="submit" disabled={saving}>
-                                <Save className="mr-2 h-4 w-4" />
+                            <Button type="submit" size="sm" disabled={saving}>
+                                <Save className="mr-1.5 h-3.5 w-3.5" />
                                 {saving ? 'Saving...' : 'Save Changes'}
                             </Button>
                         </div>

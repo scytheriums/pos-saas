@@ -1,5 +1,5 @@
 // Service Worker for PWA offline capability
-const CACHE_NAME = 'awan-pos-v1';
+const CACHE_NAME = 'awan-pos-v2';
 const OFFLINE_URL = '/offline';
 
 // Assets to cache on install
@@ -75,9 +75,13 @@ self.addEventListener('fetch', (event) => {
     // For navigation requests: Network first, fallback to offline page
     if (event.request.mode === 'navigate') {
         event.respondWith(
-            fetch(event.request).catch(() => {
-                return caches.match(OFFLINE_URL);
-            })
+            fetch(event.request).catch(() =>
+                caches.match(OFFLINE_URL).then(
+                    r => r || new Response('<html><body style="font-family:sans-serif;text-align:center;padding:2rem"><h1>Offline</h1><p>No internet connection.</p></body></html>', {
+                        headers: { 'Content-Type': 'text/html' }
+                    })
+                )
+            )
         );
         return;
     }
