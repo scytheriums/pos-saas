@@ -82,6 +82,18 @@ export default function POSPage() {
         });
         return () => window.removeEventListener('pwaPromptReady', sync);
     }, []);
+
+    // Track whether app is already installed (standalone mode) or just got installed
+    const [isInstalled, setIsInstalled] = useState(false);
+    const [showInstallGuide, setShowInstallGuide] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia('(display-mode: standalone)');
+        setIsInstalled(mq.matches);
+        const onChange = (e: MediaQueryListEvent) => setIsInstalled(e.matches);
+        mq.addEventListener('change', onChange);
+        window.addEventListener('appinstalled', () => setIsInstalled(true));
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
     const { isConnected: btConnected, isConnecting: btConnecting, deviceName: btDeviceName, connect: btConnect, disconnect: btDisconnect, printReceipt } = usePrinter();
     const [pwaPrompt, setPwaPrompt] = useState<any>(null);
     const { data: session } = authClient.useSession();
@@ -756,23 +768,66 @@ export default function POSPage() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                             )}
                         </button>
-                        {/* PWA Install button — only shows when browser deems app installable */}
-                        {pwaPrompt && (
-                            <button
-                                className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold hover:bg-purple-100 transition-colors"
-                                title="Install App"
-                                onClick={async () => {
-                                    pwaPrompt.prompt();
-                                    const { outcome } = await pwaPrompt.userChoice;
-                                    if (outcome === 'accepted') {
-                                        setPwaPrompt(null);
-                                        (window as any).__pwaPrompt = null;
-                                    }
-                                }}
-                            >
-                                <Download className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Install</span>
-                            </button>
+                        {/* PWA Install button — always visible unless app is already installed */}
+                        {!isInstalled && (
+                            <>
+                                <button
+                                    className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold hover:bg-purple-100 transition-colors"
+                                    title="Install App"
+                                    onClick={async () => {
+                                        if (pwaPrompt) {
+                                            pwaPrompt.prompt();
+                                            const { outcome } = await pwaPrompt.userChoice;
+                                            if (outcome === 'accepted') {
+                                                setPwaPrompt(null);
+                                                (window as any).__pwaPrompt = null;
+                                            }
+                                        } else {
+                                            setShowInstallGuide(true);
+                                        }
+                                    }}
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Install</span>
+                                </button>
+                                {/* Fallback install instructions modal */}
+                                {showInstallGuide && (
+                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowInstallGuide(false)}>
+                                        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h2 className="font-bold text-gray-900 text-base">Install Awan POS</h2>
+                                                <button className="text-gray-400 hover:text-gray-600" onClick={() => setShowInstallGuide(false)}><X className="w-5 h-5" /></button>
+                                            </div>
+                                            <div className="space-y-4 text-sm text-gray-700">
+                                                <div>
+                                                    <p className="font-semibold text-gray-900 mb-1">Chrome (Desktop)</p>
+                                                    <ol className="list-decimal list-inside space-y-1">
+                                                        <li>Click the <span className="font-mono bg-gray-100 px-1 rounded">&#8942;</span> menu (top-right)</li>
+                                                        <li>Select <strong>"Cast, save, and share"</strong></li>
+                                                        <li>Click <strong>"Install page as app..."</strong></li>
+                                                    </ol>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-900 mb-1">Chrome (Android)</p>
+                                                    <ol className="list-decimal list-inside space-y-1">
+                                                        <li>Tap the <span className="font-mono bg-gray-100 px-1 rounded">&#8942;</span> menu</li>
+                                                        <li>Tap <strong>"Add to Home screen"</strong></li>
+                                                        <li>Tap <strong>"Add"</strong> to confirm</li>
+                                                    </ol>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-900 mb-1">Safari (iPhone / iPad)</p>
+                                                    <ol className="list-decimal list-inside space-y-1">
+                                                        <li>Tap the <strong>Share</strong> button (box with arrow)</li>
+                                                        <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                                                        <li>Tap <strong>"Add"</strong></li>
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                         {/* Language toggle */}
                         <button
