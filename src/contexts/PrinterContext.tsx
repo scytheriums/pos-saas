@@ -26,7 +26,7 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
 
     const connect = async () => {
         if (!navigator.bluetooth) {
-            toast.error("Web Bluetooth is not supported in this browser. Please use Chrome or Edge.");
+            toast.error("Bluetooth not supported on this device/browser. Use Chrome on Android or a Chromium-based browser with Web Bluetooth support.");
             return;
         }
 

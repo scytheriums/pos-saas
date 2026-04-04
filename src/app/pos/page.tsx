@@ -377,8 +377,9 @@ export default function POSPage() {
         });
 
         if (settings.autoPrintReceipt) {
+            const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
             if (btConnected) {
-                // Print via Bluetooth thermal printer
+                // Direct Bluetooth thermal print (mobile & desktop)
                 const orderForPrint = {
                     orderId: orderId,
                     items: cart.map(item => ({
@@ -399,12 +400,13 @@ export default function POSPage() {
                     phone: tenant?.phone,
                     receiptFooter: tenant?.receiptFooter,
                 });
-            } else {
-                // Fallback to browser print
+            } else if (!isMobile) {
+                // Desktop only: fallback to browser print dialog
                 setTimeout(() => {
                     window.print();
                 }, 500);
             }
+            // Mobile without Bluetooth: skip silent — printer not connected
         }
         playSound('success', settings);
 
@@ -552,7 +554,7 @@ export default function POSPage() {
             </div>
 
             {/* Cart Items */}
-            <ScrollArea className="flex-1 p-2 md:p-3 lg:p-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-2 md:p-3 lg:p-4">
                 {cart.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-32 md:h-48 text-gray-400 gap-2 opacity-50">
                         <ShoppingCart className="w-10 h-10 md:w-14 md:h-14" />
@@ -601,7 +603,7 @@ export default function POSPage() {
                         ))}
                     </div>
                 )}
-            </ScrollArea>
+            </div>
 
             {/* Cart Footer */}
             <div className="p-2 md:p-3 lg:p-4 bg-white border-t space-y-2 md:space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
@@ -884,7 +886,7 @@ export default function POSPage() {
                                         <ChevronDown className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div className="flex-1 flex flex-col overflow-hidden">
+                                <div className="flex-1 flex flex-col min-h-0">
                                     {CartPanelContent}
                                 </div>
                             </div>
