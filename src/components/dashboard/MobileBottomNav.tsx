@@ -25,6 +25,7 @@ import {
     Timer,
     Receipt,
     Star,
+    Barcode,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -65,6 +66,7 @@ const MORE_SECTIONS = [
             { icon: Settings, label: "POS", href: "/dashboard/settings/pos" },
             { icon: Globe, label: "Localization", href: "/dashboard/settings/localization" },
             { icon: Star, label: "Loyalty", href: "/dashboard/settings/loyalty" },
+            { icon: Barcode, label: "SKU", href: "/dashboard/settings/sku" },
             { icon: Shield, label: "Roles", href: "/dashboard/settings/roles" },
         ],
     },
@@ -189,7 +191,7 @@ export function MobileBottomNav() {
 
                         {/* Title row */}
                         <div className="flex items-center justify-between px-5 py-2 shrink-0">
-                            <h2 className="font-semibold text-gray-900 text-base">Menu</h2>
+                            <h2 className="font-semibold text-gray-900 text-sm">Menu</h2>
                             <button
                                 className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
                                 onClick={closeSheet}

@@ -1,6 +1,6 @@
 # Awan POS — UI / UX Roadmap
 
-> Last updated: April 5, 2026 (all phases complete)
+> Last updated: April 6, 2026 (all phases complete)
 > Focus: Mobile responsiveness, interaction consistency, and visual polish.
 > Reference implementation: **Products page** and **Orders page** (filter popover + compact header + mobile card list).
 
@@ -22,6 +22,38 @@
     </div>
   </div>
 ```
+
+### Detail Page Header (pages with back button + action buttons)
+```tsx
+<div className="p-3 md:p-6 space-y-4">   {/* own padding for detail pages */}
+  <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center gap-3 min-w-0">
+      <Button variant="outline" size="icon" className="shrink-0">
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold truncate">Detail Title</h1>
+        <p className="text-xs text-muted-foreground">Short subtitle</p>
+      </div>
+    </div>
+    <div className="flex gap-2 shrink-0">
+      <Button size="sm" variant="outline">
+        <Icon className="w-4 h-4" />
+        <span className="hidden sm:inline ml-1.5">Label</span>
+      </Button>
+    </div>
+  </div>
+```
+
+### Content Font Size Rules (mobile-first)
+- Page/section headings: `text-xl font-bold` max — never `text-2xl`/`text-3xl`
+- Sub-section headings (role name, card title): `text-sm font-semibold`
+- Stat/metric values (in detail cards): `text-base font-bold`
+- Stat card values (compact stat cards): `text-lg font-bold leading-none`
+- SKU preview / special mono display: `text-lg font-mono font-bold`
+- Toggle row labels (`FormLabel`): no extra class (inherits `text-sm`)
+- Body content: default (`text-sm`) — never `text-base` explicitly in dense list views
+- Secondary text / metadata: `text-xs text-muted-foreground`
 
 ### Filter Popover (pages with filterable lists)
 - Trigger: `SlidersHorizontal` icon button, `variant="outline" size="sm" h-9`
@@ -187,6 +219,38 @@
 
 ---
 
+## Phase G — Mobile Font Size Audit ✅
+
+> All pages audited: content font scaled down to `text-sm` / `text-xs`; headings capped at `text-xl`.
+
+- [x] `returns/[id]` — `text-3xl` → `text-xl` heading; stat values `text-2xl`/`text-xl` → `text-base`/`text-sm`; action buttons `size="sm"` icon-only on mobile
+- [x] `returns/new` — `text-3xl` → `text-xl` heading; inline totals `text-xl`/`text-2xl` → `text-sm font-semibold`; `space-y-6` → `space-y-4`
+- [x] `customers/[id]` — `text-3xl` + `p-6 space-y-6` → `text-xl` + `p-3 md:p-6 space-y-4`; stat values `text-2xl` → `text-base`; Edit/Delete `size="sm"` icon-only on mobile
+- [x] `settings/roles` — `text-3xl` + `p-6` → `text-xl` + `space-y-4`; role card name `text-lg` → `text-sm`; New Role button `size="sm"`
+- [x] `settings/sku` — `text-3xl` → `text-xl`; SKU preview `text-2xl` → `text-lg`; subtitle → `text-xs`
+- [x] `settings/loyalty` — `FormLabel className="text-base"` → `FormLabel` (inherits `text-sm`)
+- [x] `settings/receipt` — `FormLabel className="text-base"` → `FormLabel`
+- [x] `settings/pos` — both `FormLabel className="text-base"` → `FormLabel`
+- [x] `MobileBottomNav` "Menu" heading — `text-base` → `text-sm`
+- [x] `products` empty state heading — `text-base` → `text-sm`
+
+---
+
+## Phase H — Form Input Font Audit ✅
+
+> All forms audited: helper text, toggle descriptions, and form spacing tightened.
+
+- [x] **Global** — `ui/form.tsx` `FormDescription`: `text-sm` → `text-xs` (applies to all `<FormDescription>` across every form automatically)
+- [x] `settings/loyalty` — toggle `FormItem p-4` → `p-3`; `CardContent space-y-6` → `space-y-4`
+- [x] `settings/receipt` — form wrappers `space-y-6` × 2 → `space-y-4`; toggle `FormItem p-4` → `p-3`
+- [x] `settings/pos` — both toggle `FormItem p-4` → `p-3`
+- [x] `settings/sku` — `CardContent space-y-6` → `space-y-4`; inline toggle description `text-sm` → `text-xs`
+- [x] `settings/localization` — form wrapper `space-y-6` → `space-y-4`
+- [x] `products/new` — variant toggle inline description `text-sm` → `text-xs`
+- [x] `components/products/CostHistoryTab` — stat `CardTitle text-2xl` × 3 → `text-base font-bold`; `space-y-6` → `space-y-4`
+
+---
+
 ## Progress Summary
 
 | Phase | Total Tasks | Completed | Status |
@@ -197,5 +261,7 @@
 | D — Settings | 5 | 5 | ✅ Complete |
 | E — Onboarding | 4 | 4 | ✅ Complete |
 | F — Global | 6 | 6 | ✅ Complete |
+| G — Mobile Font Audit | 10 | 10 | ✅ Complete |
+| H — Form Font Audit | 8 | 8 | ✅ Complete |
 | Deferred | 5 | 0 | — |
-| **Total** | **64** | **59** | — |
+| **Total** | **82** | **77** | — |

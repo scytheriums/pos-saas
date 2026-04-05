@@ -155,14 +155,14 @@ export default function CreateReturnPage() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center gap-4">
+        <div className="space-y-4">
+            <div className="flex items-center gap-3">
                 <Button variant="outline" size="icon" onClick={() => router.back()}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold">Create Return</h1>
-                    <p className="text-muted-foreground">Process a customer return and refund</p>
+                    <h1 className="text-xl font-bold">Create Return</h1>
+                    <p className="text-xs text-muted-foreground">Process a customer return and refund</p>
                 </div>
             </div>
 
@@ -297,7 +297,7 @@ export default function CreateReturnPage() {
                                 <div className="text-sm text-muted-foreground">
                                     {Object.keys(selectedItems).length} item(s) selected
                                 </div>
-                                <div className="text-xl font-bold">
+                                <div className="text-sm font-semibold">
                                     Total Refund: Rp {calculateTotalRefund().toLocaleString()}
                                 </div>
                             </div>
@@ -368,7 +368,7 @@ export default function CreateReturnPage() {
                         <div className="pt-4 border-t">
                             <div className="flex justify-between items-center mb-4">
                                 <span className="font-medium">Total Refund Amount:</span>
-                                <span className="text-2xl font-bold">Rp {calculateTotalRefund().toLocaleString()}</span>
+                                <span className="text-sm font-semibold">Rp {calculateTotalRefund().toLocaleString()}</span>
                             </div>
                         </div>
 

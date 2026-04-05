@@ -337,7 +337,7 @@ export default function ProductsPage() {
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
                         <Package className="h-12 w-12 text-muted-foreground mb-3" />
-                        <h3 className="text-base font-semibold mb-1">
+                        <h3 className="text-sm font-semibold mb-1">
                             {searchQuery || stockFilter !== 'ALL' ? 'No products found' : 'No products yet'}
                         </h3>
                         <p className="text-sm text-muted-foreground mb-4">

@@ -96,25 +96,25 @@ export default function CostHistoryTab({ productId }: { productId: string }) {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Current Cost Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="pb-3">
                         <CardDescription>Current Cost</CardDescription>
-                        <CardTitle className="text-2xl">Rp {data.currentCost.toLocaleString()}</CardTitle>
+                        <CardTitle className="text-base font-bold">Rp {data.currentCost.toLocaleString()}</CardTitle>
                     </CardHeader>
                 </Card>
                 <Card>
                     <CardHeader className="pb-3">
                         <CardDescription>Current Price</CardDescription>
-                        <CardTitle className="text-2xl">Rp {data.currentPrice.toLocaleString()}</CardTitle>
+                        <CardTitle className="text-base font-bold">Rp {data.currentPrice.toLocaleString()}</CardTitle>
                     </CardHeader>
                 </Card>
                 <Card>
                     <CardHeader className="pb-3">
                         <CardDescription>Current Margin</CardDescription>
-                        <CardTitle className="text-2xl">{data.currentMargin.toFixed(1)}%</CardTitle>
+                        <CardTitle className="text-base font-bold">{data.currentMargin.toFixed(1)}%</CardTitle>
                     </CardHeader>
                 </Card>
             </div>

@@ -107,9 +107,9 @@ export default function PosSettingsPage() {
                                 control={form.control}
                                 name="autoPrintReceipt"
                                 render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                                         <div className="space-y-0.5">
-                                            <FormLabel className="text-base">Auto-Print Receipt</FormLabel>
+                                            <FormLabel>Auto-Print Receipt</FormLabel>
                                             <FormDescription>
                                                 Automatically print receipt after completing a sale
                                             </FormDescription>
@@ -138,9 +138,9 @@ export default function PosSettingsPage() {
                                 control={form.control}
                                 name="soundEffects"
                                 render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                                         <div className="space-y-0.5">
-                                            <FormLabel className="text-base">Sound Effects</FormLabel>
+                                            <FormLabel>Sound Effects</FormLabel>
                                             <FormDescription>
                                                 Play sound effects for actions (scan, add to cart, checkout)
                                             </FormDescription>

@@ -116,35 +116,35 @@ export default function ReturnDetailsPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={() => router.back()}>
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                    <Button variant="outline" size="icon" className="shrink-0" onClick={() => router.back()}>
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <div>
-                        <h1 className="text-3xl font-bold">Return Details</h1>
-                        <p className="text-muted-foreground">Return ID: {returnId.substring(0, 12)}...</p>
+                    <div className="min-w-0">
+                        <h1 className="text-xl font-bold">Return Details</h1>
+                        <p className="text-xs text-muted-foreground">Return ID: {returnId.substring(0, 12)}...</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                     {returnData.status === "PENDING" && (
                         <>
-                            <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700">
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Approve Return
+                            <Button size="sm" onClick={handleApprove} className="bg-green-600 hover:bg-green-700">
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="hidden sm:inline ml-1.5">Approve</span>
                             </Button>
-                            <Button onClick={handleReject} variant="destructive">
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Reject Return
+                            <Button size="sm" onClick={handleReject} variant="destructive">
+                                <XCircle className="h-4 w-4" />
+                                <span className="hidden sm:inline ml-1.5">Reject</span>
                             </Button>
                         </>
                     )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Return Information */}
                 <Card className="md:col-span-2">
                     <CardHeader>
@@ -197,13 +197,13 @@ export default function ReturnDetailsPage() {
                         <div className="space-y-4">
                             <div>
                                 <label className="text-sm font-medium text-muted-foreground">Total Refund</label>
-                                <div className="text-2xl font-bold mt-1">
+                                <div className="text-base font-bold mt-1">
                                     Rp {Number(returnData.refundAmount).toLocaleString()}
                                 </div>
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-muted-foreground">Items Returned</label>
-                                <div className="text-xl font-semibold mt-1">{returnData.items.length}</div>
+                                <div className="text-sm font-semibold mt-1">{returnData.items.length}</div>
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-muted-foreground">Refund Method</label>

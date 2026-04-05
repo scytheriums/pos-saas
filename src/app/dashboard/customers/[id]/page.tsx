@@ -94,32 +94,32 @@ export default function CustomerDetailPage() {
     };
 
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+        <div className="p-3 md:p-6 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
                     <Link href="/dashboard/customers">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="shrink-0">
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                     </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">{customer.name}</h1>
-                        <p className="text-muted-foreground">Customer details and purchase history</p>
+                    <div className="min-w-0">
+                        <h1 className="text-xl font-bold truncate">{customer.name}</h1>
+                        <p className="text-xs text-muted-foreground">Customer details and purchase history</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
+                <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => setEditDialogOpen(true)}>
+                        <Edit className="w-4 h-4" />
+                        <span className="hidden sm:inline ml-1.5">Edit</span>
                     </Button>
-                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
+                    <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                        <Trash2 className="w-4 h-4" />
+                        <span className="hidden sm:inline ml-1.5">Delete</span>
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader>
                         <CardTitle>Contact Information</CardTitle>
@@ -147,11 +147,11 @@ export default function CustomerDetailPage() {
                     <CardContent className="space-y-2">
                         <div>
                             <p className="text-sm text-muted-foreground">Total Orders</p>
-                            <p className="text-2xl font-bold">{customer._count.orders}</p>
+                            <p className="text-base font-bold">{customer._count.orders}</p>
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Total Spent</p>
-                            <p className="text-2xl font-bold text-green-600">{formatCurrencyWithSettings(customer.totalSpent, settings)}</p>
+                            <p className="text-base font-bold text-green-600">{formatCurrencyWithSettings(customer.totalSpent, settings)}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -163,7 +163,7 @@ export default function CustomerDetailPage() {
                     <CardContent className="space-y-2">
                         <div>
                             <p className="text-sm text-muted-foreground">Points</p>
-                            <p className="text-2xl font-bold text-primary">{customer.points}</p>
+                            <p className="text-base font-bold text-primary">{customer.points}</p>
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Member Since</p>

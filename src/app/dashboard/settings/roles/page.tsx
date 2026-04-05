@@ -77,15 +77,15 @@ export default function RolesPage() {
     };
 
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-4">
+            <div className="flex justify-between items-center gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold">Roles & Permissions</h1>
-                    <p className="text-muted-foreground mt-1">Manage user roles and their permissions</p>
+                    <h1 className="text-xl font-bold">Roles & Permissions</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manage user roles and their permissions</p>
                 </div>
-                <Button onClick={handleCreate}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Role
+                <Button size="sm" onClick={handleCreate}>
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline ml-1.5">New Role</span>
                 </Button>
             </div>
 
@@ -99,7 +99,7 @@ export default function RolesPage() {
                         <Card key={role.id} className="p-6">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="font-bold text-lg">{role.name}</h3>
+                                    <h3 className="font-semibold text-sm">{role.name}</h3>
                                     {role.description && (
                                         <p className="text-sm text-muted-foreground mt-1">{role.description}</p>
                                     )}

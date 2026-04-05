@@ -123,15 +123,15 @@ export default function LoyaltySettingsPage() {
                                 Configure how customers earn and redeem loyalty points at your store.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent className="space-y-4">
                             {/* Enable toggle */}
                             <FormField
                                 control={form.control}
                                 name="enabled"
                                 render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                                         <div className="space-y-0.5">
-                                            <FormLabel className="text-base">Enable Loyalty Program</FormLabel>
+                                            <FormLabel>Enable Loyalty Program</FormLabel>
                                             <FormDescription>
                                                 When enabled, customers earn points on every purchase.
                                             </FormDescription>

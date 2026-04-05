@@ -118,9 +118,9 @@ export default function ReceiptSettingsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
                 {/* Form Section */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Content Customization</CardTitle>
@@ -130,9 +130,9 @@ export default function ReceiptSettingsPage() {
                                         control={form.control}
                                         name="showLogo"
                                         render={({ field }) => (
-                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                                                 <div className="space-y-0.5">
-                                                    <FormLabel className="text-base">Show Logo</FormLabel>
+                                                    <FormLabel>Show Logo</FormLabel>
                                                     <FormDescription>
                                                         Display your business logo on the receipt.
                                                     </FormDescription>

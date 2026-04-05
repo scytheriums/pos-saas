@@ -74,10 +74,10 @@ export default function SKUSettingsPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div>
-                <h1 className="text-3xl font-bold">SKU Auto-Generation</h1>
-                <p className="text-muted-foreground">
+                <h1 className="text-xl font-bold">SKU Auto-Generation</h1>
+                <p className="text-xs text-muted-foreground">
                     Configure automatic SKU number generation for new products
                 </p>
             </div>
@@ -89,12 +89,12 @@ export default function SKUSettingsPage() {
                         Enable and configure how SKU codes are automatically generated
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
                     {/* Enable Toggle */}
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                             <Label htmlFor="auto-generate">Enable Auto-Generate SKU</Label>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                                 Automatically generate SKU codes when creating products
                             </p>
                         </div>
@@ -145,7 +145,7 @@ export default function SKUSettingsPage() {
                     {settings.autoGenerateSku && (
                         <div className="p-4 bg-muted rounded-lg">
                             <Label className="text-sm font-medium">Preview</Label>
-                            <p className="text-2xl font-mono font-bold mt-2">{settings.preview || 'AWAN/251208/0001'}</p>
+                            <p className="text-lg font-mono font-bold mt-2">{settings.preview || 'AWAN/251208/0001'}</p>
                             <p className="text-xs text-muted-foreground mt-1">
                                 This is how your next SKU will look
                             </p>

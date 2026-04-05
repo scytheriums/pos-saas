@@ -172,7 +172,7 @@ export default function NewProductPage() {
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                                 <Label htmlFor="hasVariants">Product has variants</Label>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                     Enable if this product comes in different sizes, colors, etc.
                                 </p>
                             </div>
