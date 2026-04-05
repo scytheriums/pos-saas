@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -111,23 +111,82 @@ export default function PromotionsPage() {
     };
 
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Promotions & Discounts</h1>
-                    <p className="text-muted-foreground">Manage your store's promotions and discount codes.</p>
+                    <h1 className="text-xl font-bold">Promotions & Discounts</h1>
+                    <p className="text-xs text-muted-foreground">Manage your store's promotions and discount codes</p>
                 </div>
-                <Button onClick={() => setDialogOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Discount
+                <Button size="sm" className="h-9 gap-1.5" onClick={() => setDialogOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" />
                 </Button>
             </div>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>All Discounts</CardTitle>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
+                    {/* Mobile cards */}
+                    <div className="md:hidden divide-y">
+                        {loading ? (
+                            <div className="flex justify-center py-10">
+                                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                            </div>
+                        ) : discounts.length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground">No discounts found. Create one to get started!</div>
+                        ) : discounts.map((discount) => (
+                            <div key={discount.id} className="p-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium text-sm">{discount.name}</span>
+                                    {isExpired(discount) ? (
+                                        <Badge variant="destructive">Expired</Badge>
+                                    ) : discount.active ? (
+                                        <Badge>Active</Badge>
+                                    ) : (
+                                        <Badge variant="secondary">Inactive</Badge>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                    {discount.code && (
+                                        <code className="px-2 py-0.5 bg-gray-100 rounded text-xs">{discount.code}</code>
+                                    )}
+                                    <Badge variant="outline">{discount.type}</Badge>
+                                    <span className="text-muted-foreground">{getDiscountValue(discount)}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span>Used: {discount._count.orders}</span>
+                                        <Switch
+                                            checked={discount.active}
+                                            onCheckedChange={() => toggleActive(discount.id, discount.active)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <Button variant="ghost" size="sm" onClick={() => handleEdit(discount)}>
+                                            <Edit className="w-4 h-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => setDeleteId(discount.id)}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {/* Mobile pagination */}
+                        {!loading && discounts.length > 0 && (
+                            <div className="flex items-center justify-between p-4">
+                                <div className="text-sm text-muted-foreground">Page {page} of {totalPages}</div>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading}>
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}>
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
                     {loading ? (
                         <div className="flex justify-center py-8">
                             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -198,9 +257,10 @@ export default function PromotionsPage() {
                             </Table>
                         </div>
                     )}
+                    </div>{/* end desktop */}
 
-                    {/* Pagination */}
-                    <div className="flex items-center justify-end space-x-2 py-4">
+                    {/* Desktop pagination */}
+                    <div className="hidden md:flex items-center justify-end space-x-2 py-4 px-4">
                         <Button
                             variant="outline"
                             size="sm"

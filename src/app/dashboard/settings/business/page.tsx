@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
 const businessFormSchema = z.object({
@@ -100,16 +99,15 @@ export default function BusinessProfilePage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
             <div>
-                <h3 className="text-lg font-medium">Business Profile</h3>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold">Business Profile</h1>
+                <p className="text-xs text-muted-foreground">
                     Manage your business information and contact details.
                 </p>
             </div>
-            <Separator />
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 max-w-2xl">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-2xl">
                     <Card>
                         <CardHeader>
                             <CardTitle>General Information</CardTitle>

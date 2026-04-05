@@ -107,6 +107,18 @@
 - [x] Deduct total payouts from expected cash in shift-close calculation
 - [x] Show petty cash payout list in shift detail / shift close summary
 
+### 1.7 Mobile & Tablet Responsive Polish ✅
+> All UI/UX work has been moved to **[UI_UX_ROADMAP.md](./UI_UX_ROADMAP.md)** for focused tracking.
+> Phase A (all dashboard pages) is complete. Phases B–F cover POS, Order Detail, Settings, Onboarding, and global polish.
+
+**Summary of completed work:**
+- MobileBottomNav: added Shifts, Expenses, Loyalty links
+- Mobile card views for all dashboard list pages (Orders, Shifts, Expenses, Customers, Returns, Adjustments, Promotions, Audit Logs)
+- Compact header pattern (`text-xl font-bold`, `text-xs` subtitle, `space-y-4` outer, no own padding) applied to all pages
+- `SlidersHorizontal` filter popover applied to: Products, Orders, Customers, Returns, Expenses, Audit Logs
+- Icon-only action buttons, removed all `CardHeader`/`CardTitle` from list cards
+
+
 ### 1.4 Image Optimization Pipeline
 - [ ] Update `/api/upload` to process uploads through `sharp`
 - [ ] Generate thumbnail (100×100px) on upload
@@ -279,11 +291,11 @@
 | Phase | Total Tasks | Completed | Status |
 |---|---|---|---|
 | Phase 0 — Security | 24 | 24 | ✅ **Complete** (0.2 credential rotation is a manual step) |
-| Phase 1 — Core POS | 38 | 33 | 🔄 **In Progress** (1.1, 1.2, 1.3, 1.6 complete) |
+| Phase 1 — Core POS | 60 | 51 | 🔄 **In Progress** (1.1, 1.2, 1.3, 1.6, 1.7 complete) |
 | Phase 2 — Inventory | 33 | 0 | Not Started |
 | Phase 3 — Growth | 27 | 9 | 🔄 **In Progress** (3.2 complete) |
 | Phase 4 — Multi-Outlet | 28 | 0 | Not Started |
-| **Total** | **150** | **58** | — |
+| **Total** | **172** | **76** | — |
 
 ---
 

@@ -107,7 +107,7 @@ export function Sidebar() {
     const hasChildren = selectedMenuItem?.children && selectedMenuItem.children.length > 0;
 
     return (
-        <div className="flex h-full">
+        <div className="print:hidden flex h-full">
             {/* Primary Icon Sidebar */}
             <div className="w-16 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-2">
                 <div className="h-10 w-10 rounded-md bg-primary flex items-center justify-center mb-4">

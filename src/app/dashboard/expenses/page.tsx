@@ -22,7 +22,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Receipt, Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const EXPENSE_CATEGORIES = [
     { value: 'RENT', label: 'Rent' },
@@ -84,6 +85,35 @@ export default function ExpensesPage() {
     const [categoryFilter, setCategoryFilter] = useState('ALL');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+
+    // Filter popup state
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [pendingCategory, setPendingCategory] = useState('ALL');
+    const [pendingFrom, setPendingFrom] = useState('');
+    const [pendingTo, setPendingTo] = useState('');
+    const activeFilterCount = [categoryFilter !== 'ALL', !!dateFrom, !!dateTo].filter(Boolean).length;
+
+    const handleFilterOpen = (open: boolean) => {
+        if (open) {
+            setPendingCategory(categoryFilter);
+            setPendingFrom(dateFrom);
+            setPendingTo(dateTo);
+        }
+        setFilterOpen(open);
+    };
+
+    const applyFilters = () => {
+        setCategoryFilter(pendingCategory);
+        setDateFrom(pendingFrom);
+        setDateTo(pendingTo);
+        setFilterOpen(false);
+    };
+
+    const resetFilters = () => {
+        setPendingCategory('ALL');
+        setPendingFrom('');
+        setPendingTo('');
+    };
 
     // Pagination
     const [cursor, setCursor] = useState<string | null>(null);
@@ -225,53 +255,61 @@ export default function ExpensesPage() {
     };
 
     return (
-        <div className="p-4 md:p-6 space-y-4">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                        <Receipt className="w-5 h-5" />
-                        Expenses
-                    </h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        Track business costs and outgoings
-                    </p>
+                    <h1 className="text-xl font-bold">Expenses</h1>
+                    <p className="text-xs text-muted-foreground">Track business costs and outgoings</p>
                 </div>
-                <Button onClick={openAddModal} className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Expense
-                </Button>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2 items-end">
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Category</Label>
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                        <SelectTrigger className="h-8 w-36 text-sm">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ALL">All Categories</SelectItem>
-                            {EXPENSE_CATEGORIES.map(c => (
-                                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">From</Label>
-                    <Input type="date" className="h-8 w-36 text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">To</Label>
-                    <Input type="date" className="h-8 w-36 text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-                </div>
-                {(categoryFilter !== 'ALL' || dateFrom || dateTo) && (
-                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setCategoryFilter('ALL'); setDateFrom(''); setDateTo(''); }}>
-                        Clear
+                <div className="flex items-center gap-2">
+                    <Popover open={filterOpen} onOpenChange={handleFilterOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 gap-1.5 relative">
+                                <SlidersHorizontal className="h-3.5 w-3.5" />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-bold">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64 p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold">Filters</p>
+                                <button onClick={resetFilters} className="text-xs text-muted-foreground hover:text-foreground">Reset</button>
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Category</p>
+                                <Select value={pendingCategory} onValueChange={setPendingCategory}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">All Categories</SelectItem>
+                                        {EXPENSE_CATEGORIES.map(c => (
+                                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1.5">
+                                    <p className="text-xs font-medium text-muted-foreground">From</p>
+                                    <Input type="date" className="h-8 text-sm" value={pendingFrom} onChange={e => setPendingFrom(e.target.value)} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <p className="text-xs font-medium text-muted-foreground">To</p>
+                                    <Input type="date" className="h-8 text-sm" value={pendingTo} onChange={e => setPendingTo(e.target.value)} />
+                                </div>
+                            </div>
+                            <Button size="sm" className="w-full h-8" onClick={applyFilters}>Apply</Button>
+                        </PopoverContent>
+                    </Popover>
+                    <Button size="sm" className="h-9 gap-1.5" onClick={openAddModal}>
+                        <Plus className="h-3.5 w-3.5" />
                     </Button>
-                )}
+                </div>
             </div>
 
             {/* Total summary */}
@@ -286,7 +324,43 @@ export default function ExpensesPage() {
 
             <Card>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
+                    {/* ── Mobile card list (hidden on md+) ── */}
+                    <div className="md:hidden divide-y">
+                        {loading ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">Loading...</div>
+                        ) : expenses.length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No expenses found.</div>
+                        ) : (
+                            expenses.map((expense) => (
+                                <div key={expense.id} className="p-4 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[expense.category] ?? 'bg-gray-100 text-gray-700'}`}>
+                                            {EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.label ?? expense.category}
+                                        </span>
+                                        <span className="font-semibold text-sm">{formatCurrencyWithSettings(Number(expense.amount), settings)}</span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {formatDateWithSettings(new Date(expense.date), settings)}
+                                        {expense.user?.name && <span className="ml-2">· {expense.user.name}</span>}
+                                    </div>
+                                    {expense.notes && (
+                                        <p className="text-xs text-muted-foreground truncate">{expense.notes}</p>
+                                    )}
+                                    <div className="flex justify-end gap-1 pt-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(expense)}>
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(expense)}>
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* ── Desktop table (hidden on mobile) ── */}
+                    <div className="hidden md:block overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -347,6 +421,7 @@ export default function ExpensesPage() {
                             </TableBody>
                         </Table>
                     </div>
+                    {/* end desktop table */}
 
                     {/* Pagination */}
                     {(page > 1 || hasMore) && (

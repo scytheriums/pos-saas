@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useTenantSettings } from '@/contexts/SettingsContext';
 import { formatCurrencyWithSettings, formatDateTimeWithSettings } from '@/lib/format';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Printer, FileText } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import Link from 'next/link';
 
 import { ReceiptTemplate } from '@/components/pos/ReceiptTemplate';
@@ -163,22 +163,22 @@ export default function OrderDetailsPage() {
         <>
             <div className="print:hidden p-3 md:p-6 space-y-4">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                         <Link href="/dashboard/orders">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
                         </Link>
-                        <div>
+                        <div className="min-w-0">
                             <h1 className="text-xl font-bold">Order Details</h1>
-                            <p className="text-muted-foreground">Order ID: {order.id}</p>
+                            <p className="text-xs text-muted-foreground truncate">ID: {order.id}</p>
                         </div>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={handlePrint} size="sm">
+                    <div className="flex gap-2 shrink-0">
+                        <Button variant="outline" onClick={handlePrint} size="sm" className="h-9 gap-1.5">
                             <Printer className="h-4 w-4" />
-                            <span className="hidden sm:inline ml-2">Reprint Receipt</span>
+                            <span className="hidden sm:inline">Reprint</span>
                         </Button>
                     </div>
                 </div>
@@ -186,131 +186,161 @@ export default function OrderDetailsPage() {
                 <div className="grid gap-4 md:grid-cols-3">
                     {/* Order Information */}
                     <Card className="md:col-span-2">
-                        <CardHeader>
-                            <CardTitle>Order Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Status</p>
-                                    <div className="mt-1">{getStatusBadge(order.status)}</div>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Payment Method</p>
-                                    <p className="mt-1 font-medium">{primaryPayment}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Customer</p>
-                                    <div className="mt-1">
-                                        <p className="font-medium">
-                                            {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
+                        <CardContent className="p-0">
+                            <div className="px-4 pt-4 pb-2 border-b">
+                                <p className="font-semibold text-sm">Order Information</p>
+                            </div>
+                            <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Status</p>
+                                        <div className="mt-1">{getStatusBadge(order.status)}</div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Payment</p>
+                                        <p className="mt-1 font-medium text-sm">{primaryPayment}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Customer</p>
+                                        <div className="mt-1">
+                                            <p className="font-medium text-sm">
+                                                {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
+                                            </p>
+                                            {order.customer?.email && <p className="text-xs text-muted-foreground">{order.customer.email}</p>}
+                                            {order.customer?.phone && <p className="text-xs text-muted-foreground">{order.customer.phone}</p>}
+                                            {(order.customer?.points ?? 0) > 0 && (
+                                                <p className="text-xs text-yellow-600 font-medium mt-0.5">⭐ {order.customer!.points!.toLocaleString()} pts</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Cashier</p>
+                                        <p className="mt-1 font-medium text-sm">
+                                            {order.cashierName || <span className="text-muted-foreground">-</span>}
                                         </p>
-                                        {order.customer?.email && <p className="text-xs text-muted-foreground">{order.customer.email}</p>}
-                                        {order.customer?.phone && <p className="text-xs text-muted-foreground">{order.customer.phone}</p>}
-                                        {(order.customer?.points ?? 0) > 0 && (
-                                            <p className="text-xs text-yellow-600 font-medium mt-0.5">⭐ {order.customer!.points!.toLocaleString()} pts balance</p>
-                                        )}
                                     </div>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Cashier</p>
-                                    <p className="mt-1 font-medium">
-                                        {order.cashierName || <span className="text-muted-foreground">-</span>}
-                                    </p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="text-sm text-muted-foreground">Date</p>
-                                    <p className="mt-1 font-medium">{formatDateTimeWithSettings(order.createdAt, settings)}</p>
-                                </div>
-                                {order.notes && (
                                     <div className="col-span-2">
-                                        <p className="text-sm text-muted-foreground">Notes</p>
-                                        <p className="mt-1">{order.notes}</p>
+                                        <p className="text-xs text-muted-foreground">Date</p>
+                                        <p className="mt-1 font-medium text-sm">{formatDateTimeWithSettings(order.createdAt, settings)}</p>
                                     </div>
-                                )}
+                                    {order.notes && (
+                                        <div className="col-span-2">
+                                            <p className="text-xs text-muted-foreground">Notes</p>
+                                            <p className="mt-1 text-sm">{order.notes}</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
 
                     {/* Order Summary */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Items</span>
-                                <span>{order.items.length}</span>
+                        <CardContent className="p-0">
+                            <div className="px-4 pt-4 pb-2 border-b">
+                                <p className="font-semibold text-sm">Summary</p>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
-                            </div>
-                            {tax > 0 && (
+                            <div className="p-4 space-y-2">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Tax ({tenant?.taxRate ?? 0}%)</span>
-                                    <span>{formatCurrencyWithSettings(tax, settings)}</span>
+                                    <span className="text-muted-foreground">Items</span>
+                                    <span>{order.items.length}</span>
                                 </div>
-                            )}
-                            {order.discountAmount && Number(order.discountAmount) > 0 && (
-                                <div className="flex justify-between text-sm text-green-600">
-                                    <span>{order.discount?.name ? `Discount (${order.discount.name})` : 'Discount'}</span>
-                                    <span>-{formatCurrencyWithSettings(Number(order.discountAmount), settings)}</span>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Subtotal</span>
+                                    <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
                                 </div>
-                            )}
-                            <Separator />
-                            <div className="flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>{formatCurrencyWithSettings(Number(order.total), settings)}</span>
+                                {tax > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Tax ({tenant?.taxRate ?? 0}%)</span>
+                                        <span>{formatCurrencyWithSettings(tax, settings)}</span>
+                                    </div>
+                                )}
+                                {order.discountAmount && Number(order.discountAmount) > 0 && (
+                                    <div className="flex justify-between text-sm text-green-600">
+                                        <span>{order.discount?.name ? `Discount (${order.discount.name})` : 'Discount'}</span>
+                                        <span>-{formatCurrencyWithSettings(Number(order.discountAmount), settings)}</span>
+                                    </div>
+                                )}
+                                <Separator />
+                                <div className="flex justify-between font-bold text-base">
+                                    <span>Total</span>
+                                    <span>{formatCurrencyWithSettings(Number(order.total), settings)}</span>
+                                </div>
+                                {/* Payment breakdown */}
+                                {paymentEntries.length > 0 && (
+                                    <>
+                                        <Separator className="my-1" />
+                                        {paymentEntries.map((entry) => (
+                                            <div key={entry.id} className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">{getPaymentLabel(entry.method)}</span>
+                                                <span>{formatCurrencyWithSettings(Number(entry.amount), settings)}</span>
+                                            </div>
+                                        ))}
+                                        {change > 0 && (
+                                            <div className="flex justify-between text-sm font-medium text-green-600">
+                                                <span>Change</span>
+                                                <span>{formatCurrencyWithSettings(change, settings)}</span>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
-                            {/* Payment breakdown */}
-                            {paymentEntries.length > 0 && (
-                                <>
-                                    <Separator className="my-1" />
-                                    {paymentEntries.map((entry) => (
-                                        <div key={entry.id} className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">{getPaymentLabel(entry.method)}</span>
-                                            <span>{formatCurrencyWithSettings(Number(entry.amount), settings)}</span>
-                                        </div>
-                                    ))}
-                                    {change > 0 && (
-                                        <div className="flex justify-between text-sm font-medium text-green-600">
-                                            <span>Change</span>
-                                            <span>{formatCurrencyWithSettings(change, settings)}</span>
-                                        </div>
-                                    )}
-                                </>
-                            )}
                         </CardContent>
                     </Card>
                 </div>
 
                 {/* Order Items */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Order Items</CardTitle>
-                        <CardDescription>{order.items.length} items in this order</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
+                    <CardContent className="p-0">
+                        <div className="px-4 pt-4 pb-2 border-b flex items-center justify-between">
+                            <p className="font-semibold text-sm">Order Items</p>
+                            <span className="text-xs text-muted-foreground">{order.items.length} items</span>
+                        </div>
+                        {/* Mobile: stacked cards */}
+                        <div className="md:hidden divide-y">
                             {order.items.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                                    <div className="flex-1">
-                                        <p className="font-medium">{item.variant.product.name}</p>
-                                        <p className="text-sm text-muted-foreground">SKU: {item.variant.sku}</p>
-                                        {item.variant.optionValues.length > 0 && (
-                                            <p className="text-sm text-muted-foreground">{item.variant.optionValues.map(ov => ov.value).join(' / ')}</p>
-                                        )}
+                                <div key={item.id} className="px-4 py-3 space-y-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-sm truncate">{item.variant.product.name}</p>
+                                            {item.variant.optionValues.length > 0 && (
+                                                <p className="text-xs text-muted-foreground">{item.variant.optionValues.map(ov => ov.value).join(' / ')}</p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">SKU: {item.variant.sku}</p>
+                                        </div>
+                                        <p className="font-bold text-sm shrink-0">
+                                            {formatCurrencyWithSettings(Number(item.price) * item.quantity - Number(item.itemDiscount || 0), settings)}
+                                        </p>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-medium">{formatCurrencyWithSettings(Number(item.price), settings)}</p>
-                                        <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span>{item.quantity} × {formatCurrencyWithSettings(Number(item.price), settings)}</span>
                                         {Number(item.itemDiscount || 0) > 0 && (
-                                            <p className="text-sm text-green-600">-{formatCurrencyWithSettings(Number(item.itemDiscount), settings)}</p>
+                                            <span className="text-green-600">-{formatCurrencyWithSettings(Number(item.itemDiscount), settings)}</span>
                                         )}
                                     </div>
-                                    <div className="ml-4 text-right min-w-20">
-                                        <p className="font-bold">{formatCurrencyWithSettings(Number(item.price) * item.quantity - Number(item.itemDiscount || 0), settings)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Desktop: row layout */}
+                        <div className="hidden md:block px-4 pb-2">
+                            {order.items.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-0 gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-sm">{item.variant.product.name}</p>
+                                        <p className="text-xs text-muted-foreground">SKU: {item.variant.sku}</p>
+                                        {item.variant.optionValues.length > 0 && (
+                                            <p className="text-xs text-muted-foreground">{item.variant.optionValues.map(ov => ov.value).join(' / ')}</p>
+                                        )}
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-sm">{formatCurrencyWithSettings(Number(item.price), settings)}</p>
+                                        <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                                        {Number(item.itemDiscount || 0) > 0 && (
+                                            <p className="text-xs text-green-600">-{formatCurrencyWithSettings(Number(item.itemDiscount), settings)}</p>
+                                        )}
+                                    </div>
+                                    <div className="text-right w-24 shrink-0">
+                                        <p className="font-bold text-sm">{formatCurrencyWithSettings(Number(item.price) * item.quantity - Number(item.itemDiscount || 0), settings)}</p>
                                     </div>
                                 </div>
                             ))}

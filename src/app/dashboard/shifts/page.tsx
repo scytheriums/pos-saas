@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Timer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ShiftRow {
     id: string;
@@ -80,23 +80,81 @@ export default function ShiftsPage() {
     };
 
     return (
-        <div className="p-4 md:p-6 space-y-4">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                        <Timer className="w-5 h-5" />
-                        Shifts
-                    </h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        Cash drawer sessions and reconciliation
-                    </p>
+                    <h1 className="text-xl font-bold">Shifts</h1>
+                    <p className="text-xs text-muted-foreground">Cash drawer sessions and reconciliation</p>
                 </div>
             </div>
 
             <Card>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
+                    {/* ── Mobile card list (hidden on md+) ── */}
+                    <div className="md:hidden divide-y">
+                        {loading ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">Loading...</div>
+                        ) : shifts.length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No shifts found.</div>
+                        ) : (
+                            shifts.map((shift) => (
+                                <div key={shift.id} className="p-4 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium text-sm">{shift.user?.name ?? 'Unknown'}</span>
+                                        <Badge variant={shift.status === 'OPEN' ? 'default' : 'secondary'} className="text-xs">
+                                            {shift.status}
+                                        </Badge>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {formatDateTimeWithSettings(new Date(shift.openedAt), settings)}
+                                        {shift.closedAt && <> → {formatDateTimeWithSettings(new Date(shift.closedAt), settings)}</>}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Float</span>
+                                            <span>{formatCurrencyWithSettings(shift.openingFloat, settings)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Cash Sales</span>
+                                            <span>{shift.cashSales != null ? formatCurrencyWithSettings(shift.cashSales, settings) : '—'}</span>
+                                        </div>
+                                        {(shift.totalPayouts ?? 0) > 0 && (
+                                            <div className="flex justify-between col-span-2">
+                                                <span className="text-muted-foreground">Payouts</span>
+                                                <span className="text-orange-600">- {formatCurrencyWithSettings(shift.totalPayouts!, settings)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Expected</span>
+                                            <span>{shift.expectedCash != null ? formatCurrencyWithSettings(shift.expectedCash, settings) : '—'}</span>
+                                        </div>
+                                        {shift.actualCash != null && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Actual</span>
+                                                <span>{formatCurrencyWithSettings(shift.actualCash, settings)}</span>
+                                            </div>
+                                        )}
+                                        {shift.difference != null && (
+                                            <div className="flex justify-between col-span-2 border-t pt-1 mt-1">
+                                                <span className="font-medium">Difference</span>
+                                                <span className={`font-semibold ${differenceColor(shift.difference)}`}>
+                                                    {shift.difference >= 0 ? '+' : ''}{formatCurrencyWithSettings(shift.difference, settings)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                                        <span>{shift.orderCount ?? 0} orders</span>
+                                        {shift.totalRevenue != null && <span>Revenue: {formatCurrencyWithSettings(shift.totalRevenue, settings)}</span>}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* ── Desktop table (hidden on mobile) ── */}
+                    <div className="hidden md:block overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -188,6 +246,7 @@ export default function ShiftsPage() {
                             </TableBody>
                         </Table>
                     </div>
+                    {/* end desktop table */}
 
                     {/* Pagination */}
                     {(page > 1 || hasMore) && (

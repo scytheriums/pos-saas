@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -86,17 +85,16 @@ export default function PosSettingsPage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
             <div>
-                <h3 className="text-lg font-medium">POS Settings</h3>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold">POS Settings</h1>
+                <p className="text-xs text-muted-foreground">
                     Configure point of sale behavior and preferences.
                 </p>
             </div>
-            <Separator />
 
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 max-w-2xl">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-2xl">
                     <Card>
                         <CardHeader>
                             <CardTitle>Receipt Printing</CardTitle>

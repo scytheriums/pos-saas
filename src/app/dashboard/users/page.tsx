@@ -2,7 +2,7 @@
 
 import { authClient, type AuthUser } from '@/lib/auth-client';
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -118,24 +118,22 @@ export default function UsersPage() {
     }
 
     return (
-        <div className="p-8 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Team Management</h1>
-                <p className="text-muted-foreground">Invite and manage your team members</p>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+                <div>
+                    <h1 className="text-xl font-bold">Team Management</h1>
+                    <p className="text-xs text-muted-foreground">Invite and manage your team members</p>
+                </div>
             </div>
 
             {/* Invite Form */}
             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <UserPlus className="h-5 w-5" />
-                        Invite Team Member
-                    </CardTitle>
-                    <CardDescription>
-                        Send an invitation to join your team
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
+                    <div className="px-4 pt-4 pb-2 border-b flex items-center gap-2">
+                        <UserPlus className="h-4 w-4 text-muted-foreground" />
+                        <p className="font-semibold text-sm">Invite Team Member</p>
+                    </div>
+                    <div className="p-4">
                     <form onSubmit={handleInvite} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -197,24 +195,23 @@ export default function UsersPage() {
                             </div>
                         )}
 
-                        <Button type="submit" disabled={loading}>
-                            <Mail className="mr-2 h-4 w-4" />
+                        <Button type="submit" disabled={loading} size="sm" className="h-9 gap-1.5">
+                            <Mail className="h-4 w-4" />
                             {loading ? 'Creating...' : 'Create Invite Link'}
                         </Button>
                     </form>
+                    </div>
                 </CardContent>
             </Card>
 
             {/* Team Members List */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Team Members</CardTitle>
-                    <CardDescription>
-                        {teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
+                <CardContent className="p-0">
+                    <div className="px-4 pt-4 pb-2 border-b flex items-center justify-between">
+                        <p className="font-semibold text-sm">Team Members</p>
+                        <span className="text-xs text-muted-foreground">{teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="p-4 space-y-3">
                         {teamMembers.length === 0 ? (
                             <p className="text-center text-muted-foreground py-8">
                                 No team members yet. Invite someone to get started!
@@ -223,27 +220,28 @@ export default function UsersPage() {
                             teamMembers.map((member) => (
                                 <div
                                     key={member.id}
-                                    className="flex items-center justify-between p-4 border rounded-lg"
+                                    className="flex items-center justify-between gap-3 p-3 border rounded-lg"
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <Shield className="h-5 w-5 text-primary" />
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                            <Shield className="h-4 w-4 text-primary" />
                                         </div>
-                                        <div>
-                                            <p className="font-medium">
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-sm truncate">
                                                 {member.name || member.email}
                                             </p>
-                                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
                                             {member.role}
                                         </span>
                                         {member.id !== user?.id && (
                                             <Button
                                                 variant="ghost"
-                                                size="sm"
+                                                size="icon"
+                                                className="h-8 w-8"
                                                 onClick={() => handleRemoveUser(member.id)}
                                             >
                                                 <Trash2 className="h-4 w-4 text-destructive" />

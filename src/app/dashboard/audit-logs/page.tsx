@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Download, Search, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { format } from "date-fns";
 
 interface AuditLog {
@@ -39,6 +40,35 @@ export default function AuditLogsPage() {
     const [actionFilter, setActionFilter] = useState("all");
     const [resourceFilter, setResourceFilter] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Filter popup state
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [pendingAction, setPendingAction] = useState("all");
+    const [pendingResource, setPendingResource] = useState("all");
+    const [pendingSearch, setPendingSearch] = useState("");
+    const activeFilterCount = [actionFilter !== 'all', resourceFilter !== 'all', searchQuery !== ''].filter(Boolean).length;
+
+    const handleFilterOpen = (open: boolean) => {
+        if (open) {
+            setPendingAction(actionFilter);
+            setPendingResource(resourceFilter);
+            setPendingSearch(searchQuery);
+        }
+        setFilterOpen(open);
+    };
+
+    const applyFilters = () => {
+        setActionFilter(pendingAction);
+        setResourceFilter(pendingResource);
+        setSearchQuery(pendingSearch);
+        setFilterOpen(false);
+    };
+
+    const resetFilters = () => {
+        setPendingAction("all");
+        setPendingResource("all");
+        setPendingSearch("");
+    };
 
     useEffect(() => {
         // Reset cursor when filters change
@@ -117,90 +147,133 @@ export default function AuditLogsPage() {
     });
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold">Audit Logs</h1>
-                    <p className="text-muted-foreground">Track all system activities and changes</p>
+                    <h1 className="text-xl font-bold">Audit Logs</h1>
+                    <p className="text-xs text-muted-foreground">Track all system activities and changes</p>
                 </div>
-                <Button onClick={handleExport}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export CSV
-                </Button>
-            </div>
-
-            {/* Filters */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Filters</CardTitle>
-                    <CardDescription>Filter audit logs by action, resource, or search</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Action</label>
-                            <Select value={actionFilter} onValueChange={setActionFilter}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Actions" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Actions</SelectItem>
-                                    <SelectItem value="CREATE">Create</SelectItem>
-                                    <SelectItem value="UPDATE">Update</SelectItem>
-                                    <SelectItem value="DELETE">Delete</SelectItem>
-                                    <SelectItem value="LOGIN">Login</SelectItem>
-                                    <SelectItem value="LOGOUT">Logout</SelectItem>
-                                    <SelectItem value="EXPORT">Export</SelectItem>
-                                    <SelectItem value="SETTINGS_CHANGE">Settings Change</SelectItem>
-                                    <SelectItem value="PERMISSION_CHANGE">Permission Change</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Resource</label>
-                            <Select value={resourceFilter} onValueChange={setResourceFilter}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Resources" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Resources</SelectItem>
-                                    <SelectItem value="PRODUCT">Product</SelectItem>
-                                    <SelectItem value="CATEGORY">Category</SelectItem>
-                                    <SelectItem value="ORDER">Order</SelectItem>
-                                    <SelectItem value="USER">User</SelectItem>
-                                    <SelectItem value="CUSTOMER">Customer</SelectItem>
-                                    <SelectItem value="DISCOUNT">Discount/Promotion</SelectItem>
-                                    <SelectItem value="SETTINGS">Settings</SelectItem>
-                                    <SelectItem value="ROLE">Role</SelectItem>
-                                    <SelectItem value="STOCK_ADJUSTMENT">Stock Adjustment</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Search</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search user, email, action..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10"
-                                />
+                <div className="flex items-center gap-2">
+                    <Popover open={filterOpen} onOpenChange={handleFilterOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 gap-1.5 relative">
+                                <SlidersHorizontal className="h-3.5 w-3.5" />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-bold">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold">Filters</p>
+                                <button onClick={resetFilters} className="text-xs text-muted-foreground hover:text-foreground">Reset</button>
                             </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Action</p>
+                                <Select value={pendingAction} onValueChange={setPendingAction}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue placeholder="All Actions" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Actions</SelectItem>
+                                        <SelectItem value="CREATE">Create</SelectItem>
+                                        <SelectItem value="UPDATE">Update</SelectItem>
+                                        <SelectItem value="DELETE">Delete</SelectItem>
+                                        <SelectItem value="LOGIN">Login</SelectItem>
+                                        <SelectItem value="LOGOUT">Logout</SelectItem>
+                                        <SelectItem value="EXPORT">Export</SelectItem>
+                                        <SelectItem value="SETTINGS_CHANGE">Settings Change</SelectItem>
+                                        <SelectItem value="PERMISSION_CHANGE">Permission Change</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Resource</p>
+                                <Select value={pendingResource} onValueChange={setPendingResource}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue placeholder="All Resources" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Resources</SelectItem>
+                                        <SelectItem value="PRODUCT">Product</SelectItem>
+                                        <SelectItem value="CATEGORY">Category</SelectItem>
+                                        <SelectItem value="ORDER">Order</SelectItem>
+                                        <SelectItem value="USER">User</SelectItem>
+                                        <SelectItem value="CUSTOMER">Customer</SelectItem>
+                                        <SelectItem value="DISCOUNT">Discount/Promotion</SelectItem>
+                                        <SelectItem value="SETTINGS">Settings</SelectItem>
+                                        <SelectItem value="ROLE">Role</SelectItem>
+                                        <SelectItem value="STOCK_ADJUSTMENT">Stock Adjustment</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Search</p>
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="User, email, action..."
+                                        value={pendingSearch}
+                                        onChange={(e) => setPendingSearch(e.target.value)}
+                                        className="pl-7 h-8 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <Button size="sm" className="w-full h-8" onClick={applyFilters}>Apply</Button>
+                        </PopoverContent>
+                    </Popover>
+                    <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={handleExport}>
+                        <Download className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            </div>
 
             {/* Audit Logs Table */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Activity Log</CardTitle>
-                    <CardDescription>Showing {filteredLogs.length} of {logs.length} entries on this page</CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
+                    {/* Mobile cards */}
+                    <div className="md:hidden divide-y">
+                        {loading ? (
+                            <div className="text-center py-10 text-muted-foreground">Loading...</div>
+                        ) : filteredLogs.length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground">No audit logs found</div>
+                        ) : filteredLogs.map((log) => (
+                            <div key={log.id} className="p-4 space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant={getActionBadgeColor(log.action) as any}>{log.action}</Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                        {format(new Date(log.createdAt), "MMM d, HH:mm")}
+                                    </span>
+                                </div>
+                                <div className="text-sm font-medium">{log.resource}</div>
+                                <div className="text-xs text-muted-foreground">
+                                    {log.userName} &middot; {log.user.email}
+                                </div>
+                                {log.ipAddress && (
+                                    <div className="text-xs text-muted-foreground">IP: {log.ipAddress}</div>
+                                )}
+                            </div>
+                        ))}
+                        {/* Mobile pagination */}
+                        {!loading && filteredLogs.length > 0 && (
+                            <div className="flex items-center justify-between p-4">
+                                <div className="text-sm text-muted-foreground">Page {page}</div>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={cursorHistory.length === 0}>
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={goToNextPage} disabled={!hasMore}>
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
                     {loading ? (
                         <div className="text-center py-8 text-muted-foreground">Loading...</div>
                     ) : filteredLogs.length === 0 ? (
@@ -279,6 +352,7 @@ export default function AuditLogsPage() {
                             </div>
                         </>
                     )}
+                    </div>{/* end desktop */}
                 </CardContent>
             </Card>
         </div>

@@ -171,8 +171,8 @@ export function OnboardingWizard() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
-            <div className="max-w-3xl mx-auto py-8">
+        <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50 p-4 md:p-6">
+            <div className="max-w-3xl mx-auto py-6 md:py-8">
                 {/* Header */}
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold mb-2">Welcome to Awan POS!</h1>
@@ -182,8 +182,16 @@ export function OnboardingWizard() {
                 </div>
 
                 {/* Progress Bar */}
-                <div className="mb-8">
-                    <div className="flex justify-between mb-2">
+                <div className="mb-6 md:mb-8">
+                    {/* Mobile: compact step indicator */}
+                    <div className="flex items-center justify-between mb-3 sm:hidden">
+                        <p className="text-sm font-medium">
+                            Step {currentStep + 1} of {STEPS.length}: <span className="text-primary">{STEPS[currentStep].title}</span>
+                        </p>
+                        <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
+                    </div>
+                    {/* Desktop: full step indicator */}
+                    <div className="hidden sm:flex justify-between mb-3">
                         {STEPS.map((step, index) => (
                             <div
                                 key={step.number}
@@ -191,7 +199,7 @@ export function OnboardingWizard() {
                             >
                                 <div className="flex flex-col items-center">
                                     <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition-colors ${index < currentStep
+                                        className={`w-9 h-9 rounded-full flex items-center justify-center font-medium transition-colors ${index < currentStep
                                             ? 'bg-primary text-primary-foreground'
                                             : index === currentStep
                                                 ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
@@ -199,15 +207,15 @@ export function OnboardingWizard() {
                                             }`}
                                     >
                                         {index < currentStep ? (
-                                            <Check className="h-5 w-5" />
+                                            <Check className="h-4 w-4" />
                                         ) : (
                                             step.number
                                         )}
                                     </div>
-                                    <span className="text-xs mt-1 hidden sm:block">{step.title}</span>
+                                    <span className="text-xs mt-1">{step.title}</span>
                                 </div>
                                 {index < STEPS.length - 1 && (
-                                    <div className="flex-1 h-1 mx-2 bg-muted relative top-[-12px]">
+                                    <div className="flex-1 h-1 mx-2 bg-muted relative -top-3">
                                         <div
                                             className="h-full bg-primary transition-all"
                                             style={{ width: index < currentStep ? '100%' : '0%' }}
@@ -226,7 +234,7 @@ export function OnboardingWizard() {
                         <CurrentStepComponent form={form} />
 
                         {/* Navigation */}
-                        <div className="flex justify-between pt-4">
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 pt-4">
                             <Button
                                 type="button"
                                 variant="outline"

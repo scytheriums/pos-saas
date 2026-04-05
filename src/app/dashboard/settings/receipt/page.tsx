@@ -9,7 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
 import { ReceiptTemplate } from '@/components/pos/ReceiptTemplate';
 import { ImageUpload } from '@/components/ui/image-upload';
@@ -109,16 +108,15 @@ export default function ReceiptSettingsPage() {
     ];
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
             <div>
-                <h3 className="text-lg font-medium">Receipt Settings</h3>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold">Receipt Settings</h1>
+                <p className="text-xs text-muted-foreground">
                     Customize how your receipts look. Changes are reflected in the preview.
                 </p>
             </div>
-            <Separator />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
                 {/* Form Section */}
                 <div className="space-y-6">
                     <Form {...form}>

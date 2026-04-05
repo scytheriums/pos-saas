@@ -104,16 +104,15 @@ export default function LoyaltySettingsPage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
             <div>
-                <h3 className="text-lg font-medium">Loyalty Program</h3>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold">Loyalty Program</h1>
+                <p className="text-xs text-muted-foreground">
                     Reward customers with points for every purchase. Points can be redeemed for discounts.
                 </p>
             </div>
-            <Separator />
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 max-w-2xl">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-2xl">
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">

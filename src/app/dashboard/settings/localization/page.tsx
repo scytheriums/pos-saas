@@ -129,20 +129,19 @@ export default function LocalizationSettingsPage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
             <div>
-                <h3 className="text-lg font-medium">Localization Settings</h3>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold">Localization Settings</h1>
+                <p className="text-xs text-muted-foreground">
                     Configure regional preferences and formats.
                 </p>
             </div>
-            <Separator />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Form Section */}
                 <div className="lg:col-span-2 space-y-6">
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Language & Region</CardTitle>

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 type Category = {
     id: string;
@@ -212,19 +212,18 @@ export default function CategoriesPage() {
     }, 0);
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold">Categories</h1>
-                    <p className="text-muted-foreground">Organize your products with hierarchical categories</p>
+                    <h1 className="text-xl font-bold">Categories</h1>
+                    <p className="text-xs text-muted-foreground">Organize your products with hierarchical categories</p>
                 </div>
 
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                     <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Category
+                        <Button size="sm" className="h-9 gap-1.5">
+                            <Plus className="h-3.5 w-3.5" />
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -267,38 +266,35 @@ export default function CategoriesPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Categories</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalCategories}</div>
-                    </CardContent>
+            <div className="grid gap-2 grid-cols-3">
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">Total</p>
+                            <p className="text-lg font-bold leading-none mt-1">{totalCategories}</p>
+                        </div>
+                    </div>
                 </Card>
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Root Categories</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{categories.length}</div>
-                    </CardContent>
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">Root</p>
+                            <p className="text-lg font-bold leading-none mt-1">{categories.length}</p>
+                        </div>
+                    </div>
                 </Card>
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Categorized Products</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalProducts}</div>
-                    </CardContent>
+                <Card className="py-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="min-w-0">
+                            <p className="text-[11px] text-muted-foreground leading-none">Products</p>
+                            <p className="text-lg font-bold leading-none mt-1">{totalProducts}</p>
+                        </div>
+                    </div>
                 </Card>
             </div>
 
             {/* Category Tree */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Category Hierarchy</CardTitle>
-                </CardHeader>
                 <CardContent>
                     {loading ? (
                         <div className="text-center py-8 text-muted-foreground">Loading categories...</div>

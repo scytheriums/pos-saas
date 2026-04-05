@@ -102,6 +102,7 @@ export default function POSPage() {
     const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
     const [showPettyCashModal, setShowPettyCashModal] = useState(false);
     const cartDrawerRef = useRef<HTMLDivElement>(null);
+    const cartScrollRef = useRef<HTMLDivElement>(null);
     const cartTouchStartY = useRef(0);
 
     // Pagination state
@@ -453,7 +454,8 @@ export default function POSPage() {
 
     const handleCartTouchMove = (e: React.TouchEvent) => {
         const delta = e.touches[0].clientY - cartTouchStartY.current;
-        if (delta > 0 && cartDrawerRef.current) {
+        const scrollTop = cartScrollRef.current?.scrollTop ?? 0;
+        if (delta > 0 && scrollTop === 0 && cartDrawerRef.current) {
             cartDrawerRef.current.style.transform = `translateY(${delta}px)`;
         }
     };
@@ -464,7 +466,7 @@ export default function POSPage() {
             cartDrawerRef.current.style.transition = '';
             cartDrawerRef.current.style.transform = '';
         }
-        if (delta > 80) closeMobileCart();
+        if (delta > 80 && (cartScrollRef.current?.scrollTop ?? 0) === 0) closeMobileCart();
     };
 
     const processSuccessfulOrder = (orderId: string, cashierName: string, isOffline = false, paymentEntries?: { method: string; amount: number }[], pointsEarned = 0) => {
@@ -684,7 +686,7 @@ export default function POSPage() {
             </div>
 
             {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto overscroll-contain p-2 md:p-3 lg:p-4">
+            <div ref={cartScrollRef} className="flex-1 overflow-y-auto overscroll-contain p-2 md:p-3 lg:p-4">
                 {cart.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-32 md:h-48 text-gray-400 gap-2 opacity-50">
                         <ShoppingCart className="w-10 h-10 md:w-14 md:h-14" />
@@ -730,14 +732,14 @@ export default function POSPage() {
                                         </div>
                                         <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden">
                                             <button
-                                                className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
+                                                className="w-7 h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
                                                 onClick={() => updateQuantity(item.variantId || item.id, -1)}
                                             >
                                                 <Minus className="w-3 h-3" />
                                             </button>
-                                            <span className="text-xs font-bold w-5 md:w-6 text-center select-none">{item.quantity}</span>
+                                            <span className="text-xs font-bold w-6 text-center select-none">{item.quantity}</span>
                                             <button
-                                                className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
+                                                className="w-7 h-7 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700 active:bg-gray-300"
                                                 onClick={() => updateQuantity(item.variantId || item.id, 1)}
                                             >
                                                 <Plus className="w-3 h-3" />
@@ -794,7 +796,7 @@ export default function POSPage() {
 
                 {/* Points Redemption */}
                 {selectedCustomer && settings.pointRedemptionRate > 0 && customerPoints !== null && customerPoints >= settings.minimumRedeemPoints && customerPoints > 0 && (
-                    <div className="flex gap-2 items-center">
+                    <div className="flex flex-wrap gap-2 items-center gap-y-1">
                         <Input
                             type="number"
                             placeholder={`Redeem points (max ${customerPoints})`}
@@ -1027,10 +1029,6 @@ export default function POSPage() {
                                 <span className="hidden sm:inline">Open</span>
                             </button>
                         )}
-                        {/* Avatar */}
-                        <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold shadow-md shrink-0">
-                            {tenant?.name?.substring(0, 2).toUpperCase() || 'ST'}
-                        </div>
                     </div>
                 </header>
 
@@ -1038,7 +1036,7 @@ export default function POSPage() {
                 <div className="flex-1 flex overflow-hidden relative">
 
                     {/* Left: Product Grid */}
-                    <div className="flex-1 flex flex-col p-5 gap-4 overflow-hidden min-w-0">
+                    <div className="flex-1 flex flex-col p-2 md:p-4 gap-3 overflow-hidden min-w-0">
                         {/* Search */}
                         <div className="relative shrink-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />

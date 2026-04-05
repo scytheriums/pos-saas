@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, X } from "lucide-react";
+import { Search, Loader2, X, Plus } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -117,7 +117,9 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button onClick={resetForm}>New Adjustment</Button>
+                <Button size="sm" className="h-9 gap-1.5" onClick={resetForm}>
+                    <Plus className="h-3.5 w-3.5" />
+                </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
@@ -206,7 +208,7 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Quantity Adjustment</Label>
+                            <Label>Adjustment</Label>
                             <Input
                                 type="number"
                                 placeholder="-5 or 10"

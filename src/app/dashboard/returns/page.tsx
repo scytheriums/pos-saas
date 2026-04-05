@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronLeft, ChevronRight, Eye, CheckCircle, XCircle, RotateCcw } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Eye, CheckCircle, XCircle, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -49,6 +50,33 @@ export default function ReturnsPage() {
     // Filters
     const [statusFilter, setStatusFilter] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Filter popup state
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState("all");
+    const [pendingSearch, setPendingSearch] = useState("");
+    const activeFilterCount = [statusFilter !== 'all', searchQuery !== ''].filter(Boolean).length;
+
+    const handleFilterOpen = (open: boolean) => {
+        if (open) {
+            setPendingStatus(statusFilter);
+            setPendingSearch(searchQuery);
+        }
+        setFilterOpen(open);
+    };
+
+    const applyFilters = () => {
+        setStatusFilter(pendingStatus);
+        setSearchQuery(pendingSearch);
+        setCursor(null);
+        setCursorHistory([]);
+        setFilterOpen(false);
+    };
+
+    const resetFilters = () => {
+        setPendingStatus("all");
+        setPendingSearch("");
+    };
 
     useEffect(() => {
         // Reset cursor when filter changes
@@ -177,67 +205,124 @@ export default function ReturnsPage() {
     });
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold">Returns & Refunds</h1>
-                    <p className="text-muted-foreground">Manage customer returns and process refunds</p>
+                    <h1 className="text-xl font-bold">Returns & Refunds</h1>
+                    <p className="text-xs text-muted-foreground">Manage customer returns and process refunds</p>
                 </div>
-                <Link href="/dashboard/returns/new">
-                    <Button>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Create Return
-                    </Button>
-                </Link>
-            </div>
-
-            {/* Filters */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Filters</CardTitle>
-                    <CardDescription>Filter returns by status or search</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Status</label>
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="PENDING">Pending</SelectItem>
-                                    <SelectItem value="APPROVED">Approved</SelectItem>
-                                    <SelectItem value="COMPLETED">Completed</SelectItem>
-                                    <SelectItem value="REJECTED">Rejected</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Search</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by order ID or customer..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10"
-                                />
+                <div className="flex items-center gap-2">
+                    <Popover open={filterOpen} onOpenChange={handleFilterOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 gap-1.5 relative">
+                                <SlidersHorizontal className="h-3.5 w-3.5" />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-bold">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64 p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold">Filters</p>
+                                <button onClick={resetFilters} className="text-xs text-muted-foreground hover:text-foreground">Reset</button>
                             </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Status</p>
+                                <Select value={pendingStatus} onValueChange={setPendingStatus}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue placeholder="All Statuses" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Statuses</SelectItem>
+                                        <SelectItem value="PENDING">Pending</SelectItem>
+                                        <SelectItem value="APPROVED">Approved</SelectItem>
+                                        <SelectItem value="COMPLETED">Completed</SelectItem>
+                                        <SelectItem value="REJECTED">Rejected</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-muted-foreground">Search</p>
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Order ID or customer..."
+                                        value={pendingSearch}
+                                        onChange={(e) => setPendingSearch(e.target.value)}
+                                        className="pl-7 h-8 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <Button size="sm" className="w-full h-8" onClick={applyFilters}>Apply</Button>
+                        </PopoverContent>
+                    </Popover>
+                    <Link href="/dashboard/returns/new">
+                        <Button size="sm" className="h-9 gap-1.5">
+                            <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                    </Link>
+                </div>
+            </div>
 
             {/* Returns Table */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Returns</CardTitle>
-                    <CardDescription>Showing {filteredReturns.length} of {returns.length} returns on this page</CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
+                    {/* Mobile cards */}
+                    <div className="md:hidden divide-y">
+                        {loading ? (
+                            <div className="text-center py-10 text-muted-foreground">Loading...</div>
+                        ) : filteredReturns.length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground">No returns found</div>
+                        ) : filteredReturns.map((ret) => (
+                            <div key={ret.id} className="p-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium text-sm">
+                                        {ret.customer?.name || ret.order.customerName || "Guest"}
+                                    </span>
+                                    {getStatusBadge(ret.status)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {format(new Date(ret.createdAt), "MMM d, yyyy")}
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">{getReasonLabel(ret.reason)}</span>
+                                    <span className="font-semibold">Rp {Number(ret.refundAmount).toLocaleString()}</span>
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                    <Link href={`/dashboard/returns/${ret.id}`}>
+                                        <Button variant="outline" size="sm">
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                    </Link>
+                                    {ret.status === "PENDING" && (
+                                        <>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleApprove(ret.id)}
+                                                className="text-green-600"
+                                            >
+                                                <CheckCircle className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleReject(ret.id)}
+                                                className="text-red-600"
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
                     {loading ? (
                         <div className="text-center py-8 text-muted-foreground">Loading...</div>
                     ) : filteredReturns.length === 0 ? (
@@ -364,6 +449,7 @@ export default function ReturnsPage() {
                             </div>
                         </>
                     )}
+                    </div>{/* end desktop */}
                 </CardContent>
             </Card>
         </div>
