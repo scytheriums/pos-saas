@@ -285,6 +285,9 @@ export async function POST(req: NextRequest) {
             }
 
             return { order, stockWarnings, pointsEarned };
+        }, {
+            maxWait: 10000,  // 10s max wait for a connection
+            timeout: 30000,  // 30s max for the transaction to complete
         });
 
         // Log audit trail
