@@ -247,14 +247,15 @@ export async function POST(req: NextRequest) {
                 }
             });
 
-            // 3. Update Stock
+            // 3. Update Stock (only variants confirmed found in validation step)
             for (const item of items) {
                 const variantId = item.variantId || item.id;
+                if (!variantDataMap.has(variantId)) continue;
                 await tx.productVariant.update({
                     where: { id: variantId },
                     data: {
                         stock: {
-                            decrement: item.quantity
+                            decrement: Math.floor(Number(item.quantity))
                         }
                     }
                 });
@@ -305,6 +306,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(result, { status: 201 });
     } catch (error) {
         console.error("Error creating order:", error);
-        return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
+        if (error instanceof Error) {
+            console.error("Error name:", error.name);
+            console.error("Error message:", error.message);
+            console.error("Error cause:", (error as any).code, (error as any).meta);
+        }
+        const msg = error instanceof Error ? error.message : String(error);
+        return NextResponse.json({ error: "Failed to create order", details: msg }, { status: 500 });
     }
 }
