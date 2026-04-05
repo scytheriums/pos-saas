@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2, Tag, Timer } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2, Tag, Timer, Banknote } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PaymentMethodSelector } from "@/components/pos/PaymentMethodSelector";
 import { OpenShiftModal, CloseShiftModal, type Shift } from "@/components/pos/ShiftModal";
+import { PettyCashModal } from "@/components/pos/PettyCashModal";
 import { OfflineIndicator } from "@/components/pos/OfflineIndicator";
 import { db } from "@/lib/db";
 import Link from "next/link";
@@ -99,6 +100,7 @@ export default function POSPage() {
     const [activeShift, setActiveShift] = useState<Shift | null>(null);
     const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
     const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+    const [showPettyCashModal, setShowPettyCashModal] = useState(false);
     const cartDrawerRef = useRef<HTMLDivElement>(null);
     const cartTouchStartY = useRef(0);
 
@@ -932,6 +934,11 @@ export default function POSPage() {
                     }}
                 />
             )}
+            <PettyCashModal
+                open={showPettyCashModal}
+                shift={activeShift}
+                onClose={() => setShowPettyCashModal(false)}
+            />
             {isOwner && (
                 <div className="print:hidden h-full shrink-0 hidden xl:block">
                     <Sidebar />
@@ -992,6 +999,7 @@ export default function POSPage() {
                         </button>
                         {/* Shift indicator / Close Shift */}
                         {activeShift ? (
+                            <>
                             <button
                                 className="flex items-center gap-1 px-2 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-semibold hover:bg-green-100 transition-colors"
                                 onClick={() => setShowCloseShiftModal(true)}
@@ -1000,6 +1008,15 @@ export default function POSPage() {
                                 <Timer className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Shift</span>
                             </button>
+                            <button
+                                className="flex items-center gap-1 px-2 py-1.5 bg-orange-50 text-orange-700 rounded-full text-xs font-semibold hover:bg-orange-100 transition-colors"
+                                onClick={() => setShowPettyCashModal(true)}
+                                title="Record a petty cash payout"
+                            >
+                                <Banknote className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Cash Out</span>
+                            </button>
+                            </>
                         ) : (
                             <button
                                 className="flex items-center gap-1 px-2 py-1.5 bg-yellow-50 text-yellow-700 rounded-full text-xs font-semibold hover:bg-yellow-100 transition-colors"

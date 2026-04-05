@@ -108,6 +108,7 @@ model Tenant {
   invitations      Invitation[]
   shifts           Shift[]
   expenses         Expense[]
+  pettyCashPayouts PettyCashPayout[]
 }
 
 model User {
@@ -128,6 +129,7 @@ model User {
   updatedAt     DateTime   @updatedAt
   shifts        Shift[]
   expenses      Expense[]
+  pettyCashPayouts PettyCashPayout[]
 
   @@index([tenantId])
 }
@@ -365,11 +367,30 @@ model Shift {
   tenantId       String
   tenant         Tenant      @relation(fields: [tenantId], references: [id])
   orders         Order[]
+  pettyCashPayouts PettyCashPayout[]
   createdAt      DateTime    @default(now())
 
   @@index([tenantId])
   @@index([userId])
   @@index([status])
+}
+
+// ─── Petty Cash Payouts ────────────────────────────────────────────────────────
+
+model PettyCashPayout {
+  id        String   @id @default(cuid())
+  amount    Decimal  @db.Decimal(10, 2)
+  reason    String
+  shiftId   String
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy String
+  user      User     @relation(fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([shiftId])
+  @@index([tenantId])
 }
 
 model OrderItem {

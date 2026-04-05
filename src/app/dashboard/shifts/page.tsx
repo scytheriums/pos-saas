@@ -21,6 +21,7 @@ interface ShiftRow {
     notes: string | null;
     cashSales?: number;
     totalRevenue?: number;
+    totalPayouts?: number;
     orderCount?: number;
     user?: { name: string; email?: string } | null;
 }
@@ -105,6 +106,7 @@ export default function ShiftsPage() {
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Float</TableHead>
                                     <TableHead className="text-right">Cash Sales</TableHead>
+                                    <TableHead className="text-right">Payouts</TableHead>
                                     <TableHead className="text-right">Expected</TableHead>
                                     <TableHead className="text-right">Actual</TableHead>
                                     <TableHead className="text-right">Difference</TableHead>
@@ -115,13 +117,13 @@ export default function ShiftsPage() {
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
+                                        <TableCell colSpan={12} className="text-center py-10 text-muted-foreground">
                                             Loading...
                                         </TableCell>
                                     </TableRow>
                                 ) : shifts.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
+                                        <TableCell colSpan={12} className="text-center py-10 text-muted-foreground">
                                             No shifts found.
                                         </TableCell>
                                     </TableRow>
@@ -150,6 +152,11 @@ export default function ShiftsPage() {
                                             <TableCell className="text-right">
                                                 {shift.cashSales != null
                                                     ? formatCurrencyWithSettings(shift.cashSales, settings)
+                                                    : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-right text-orange-600">
+                                                {shift.totalPayouts != null && shift.totalPayouts > 0
+                                                    ? `- ${formatCurrencyWithSettings(shift.totalPayouts, settings)}`
                                                     : '—'}
                                             </TableCell>
                                             <TableCell className="text-right">

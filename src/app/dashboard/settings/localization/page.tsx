@@ -99,6 +99,9 @@ export default function LocalizationSettingsPage() {
         showLogo: true,
         autoPrintReceipt: false,
         soundEffects: false,
+        pointsPerCurrency: 0,
+        pointRedemptionRate: 0,
+        minimumRedeemPoints: 0,
     };
 
     // Helper function to format date based on selected format

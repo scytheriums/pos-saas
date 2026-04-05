@@ -97,6 +97,16 @@
 - [x] Wire expense totals into analytics — subtract from revenue to show true net profit
 - [x] Update analytics summary chart to include expense line
 
+### 1.6 Petty Cash Payout
+- [x] Add `PettyCashPayout` model to Prisma schema (`amount`, `reason`, `shiftId`, `tenantId`, `createdBy`, `createdAt`)
+- [x] Run and verify database migration
+- [x] Create `GET /api/petty-cash` — list payouts for a shift or tenant
+- [x] Create `POST /api/petty-cash` — record a cash payout during an active shift
+- [x] Add "Petty Cash Out" button in POS (visible only when a shift is active)
+- [x] Quick-entry modal: amount + reason field
+- [x] Deduct total payouts from expected cash in shift-close calculation
+- [x] Show petty cash payout list in shift detail / shift close summary
+
 ### 1.4 Image Optimization Pipeline
 - [ ] Update `/api/upload` to process uploads through `sharp`
 - [ ] Generate thumbnail (100×100px) on upload
@@ -269,11 +279,11 @@
 | Phase | Total Tasks | Completed | Status |
 |---|---|---|---|
 | Phase 0 — Security | 24 | 24 | ✅ **Complete** (0.2 credential rotation is a manual step) |
-| Phase 1 — Core POS | 30 | 25 | 🔄 **In Progress** (1.1, 1.2, 1.3 complete) |
+| Phase 1 — Core POS | 38 | 33 | 🔄 **In Progress** (1.1, 1.2, 1.3, 1.6 complete) |
 | Phase 2 — Inventory | 33 | 0 | Not Started |
 | Phase 3 — Growth | 27 | 9 | 🔄 **In Progress** (3.2 complete) |
 | Phase 4 — Multi-Outlet | 28 | 0 | Not Started |
-| **Total** | **142** | **58** | — |
+| **Total** | **150** | **58** | — |
 
 ---
 

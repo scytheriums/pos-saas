@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
         // Attach cash sales total and total revenue per shift
         const enriched = await Promise.all(
             data.map(async (shift) => {
-                const [cashAgg, totalAgg] = await Promise.all([
+                const [cashAgg, totalAgg, payoutAgg] = await Promise.all([
                     prisma.order.aggregate({
                         where: { shiftId: shift.id, status: 'COMPLETED', paymentMethod: 'CASH' },
                         _sum: { total: true },
@@ -47,13 +47,18 @@ export async function GET(req: NextRequest) {
                         where: { shiftId: shift.id, status: 'COMPLETED' },
                         _sum: { total: true },
                     }),
+                    prisma.pettyCashPayout.aggregate({
+                        where: { shiftId: shift.id },
+                        _sum: { amount: true },
+                    }),
                 ]);
                 const cashSales = Number((cashAgg._sum as any)?.total ?? 0);
-                const expectedCash = Number(shift.openingFloat) + cashSales;
+                const totalPayouts = Number((payoutAgg._sum as any)?.amount ?? 0);
+                const expectedCash = Number(shift.openingFloat) + cashSales - totalPayouts;
                 const totalRevenue = Number((totalAgg._sum as any)?.total ?? 0);
                 const orderCount = shift._count.orders;
                 const { _count, ...rest } = shift;
-                return { ...rest, cashSales, expectedCash, totalRevenue, orderCount };
+                return { ...rest, cashSales, expectedCash, totalPayouts, totalRevenue, orderCount };
             })
         );
 

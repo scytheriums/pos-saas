@@ -130,6 +130,8 @@ export function CloseShiftModal({
   const [summary, setSummary] = useState<{
     cashSales: number;
     expectedCash: number;
+    totalPayouts: number;
+    payouts: { id: string; amount: number; reason: string; createdAt: string }[];
   } | null>(null);
 
   // Fetch shift summary when modal opens
@@ -141,6 +143,8 @@ export function CloseShiftModal({
         setSummary({
           cashSales: data.shift.cashSales ?? 0,
           expectedCash: data.shift.expectedCash ?? 0,
+          totalPayouts: data.shift.totalPayouts ?? 0,
+          payouts: data.shift.payouts ?? [],
         });
       }
     } catch {
@@ -215,10 +219,27 @@ export function CloseShiftModal({
                 <span className="text-muted-foreground">Cash Sales</span>
                 <span>Rp {summary.cashSales.toLocaleString("id-ID")}</span>
               </div>
+              {summary.totalPayouts > 0 && (
+                <div className="flex justify-between text-orange-600">
+                  <span>Petty Cash Payouts</span>
+                  <span>- Rp {summary.totalPayouts.toLocaleString("id-ID")}</span>
+                </div>
+              )}
               <div className="flex justify-between font-medium border-t pt-1 mt-1">
                 <span>Expected Cash</span>
                 <span>Rp {summary.expectedCash.toLocaleString("id-ID")}</span>
               </div>
+            </div>
+          )}
+          {summary && summary.payouts.length > 0 && (
+            <div className="rounded-md border p-3 space-y-1 text-sm">
+              <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide mb-1">Petty Cash Detail</p>
+              {summary.payouts.map((p) => (
+                <div key={p.id} className="flex justify-between">
+                  <span className="text-muted-foreground truncate max-w-[60%]">{p.reason}</span>
+                  <span className="text-orange-600">- Rp {Number(p.amount).toLocaleString("id-ID")}</span>
+                </div>
+              ))}
             </div>
           )}
           <div className="space-y-1">
