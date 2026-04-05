@@ -30,9 +30,10 @@ interface AuditLog {
 export default function AuditLogsPage() {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [total, setTotal] = useState(0);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
+    const [hasMore, setHasMore] = useState(false);
+    const page = cursorHistory.length + 1;
 
     // Filters
     const [actionFilter, setActionFilter] = useState("all");
@@ -40,17 +41,20 @@ export default function AuditLogsPage() {
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
+        // Reset cursor when filters change
+        setCursor(null);
+        setCursorHistory([]);
+    }, [actionFilter, resourceFilter]);
+
+    useEffect(() => {
         fetchLogs();
-    }, [page, actionFilter, resourceFilter]);
+    }, [cursor, actionFilter, resourceFilter]);
 
     const fetchLogs = async () => {
         try {
             setLoading(true);
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: "20"
-            });
-
+            const params = new URLSearchParams({ limit: "20" });
+            if (cursor) params.append("cursor", cursor);
             if (actionFilter && actionFilter !== "all") params.append("action", actionFilter);
             if (resourceFilter && resourceFilter !== "all") params.append("resource", resourceFilter);
 
@@ -59,13 +63,27 @@ export default function AuditLogsPage() {
 
             const data = await response.json();
             setLogs(data.logs);
-            setTotalPages(data.pagination.totalPages);
-            setTotal(data.pagination.total);
+            setHasMore(data.hasMore);
         } catch (error) {
             console.error("Error fetching audit logs:", error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const goToNextPage = () => {
+        const lastId = logs[logs.length - 1]?.id;
+        if (lastId && hasMore) {
+            setCursorHistory(h => [...h, cursor]);
+            setCursor(lastId);
+        }
+    };
+
+    const goToPrevPage = () => {
+        if (cursorHistory.length === 0) return;
+        const prev = cursorHistory[cursorHistory.length - 1];
+        setCursorHistory(h => h.slice(0, -1));
+        setCursor(prev);
     };
 
     const handleExport = () => {
@@ -179,7 +197,7 @@ export default function AuditLogsPage() {
             {/* Audit Logs Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Activity Log ({total} total entries)</CardTitle>
+                    <CardTitle>Activity Log</CardTitle>
                     <CardDescription>Showing {filteredLogs.length} of {logs.length} entries on this page</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -236,14 +254,14 @@ export default function AuditLogsPage() {
                             {/* Pagination */}
                             <div className="flex items-center justify-between mt-4">
                                 <div className="text-sm text-muted-foreground">
-                                    Page {page} of {totalPages}
+                                    Page {page}
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        disabled={page === 1}
+                                        onClick={goToPrevPage}
+                                        disabled={cursorHistory.length === 0}
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                         Previous
@@ -251,8 +269,8 @@ export default function AuditLogsPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={page === totalPages}
+                                        onClick={goToNextPage}
+                                        disabled={!hasMore}
                                     >
                                         Next
                                         <ChevronRight className="h-4 w-4" />

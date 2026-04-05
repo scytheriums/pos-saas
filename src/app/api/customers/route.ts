@@ -13,10 +13,9 @@ export async function GET(req: NextRequest) {
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') ?? '1', 10);
-        const limit = parseInt(searchParams.get('limit') ?? '20', 10);
+        const cursor = searchParams.get('cursor');
+        const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
         const search = searchParams.get('search');
-        const skip = (page - 1) * limit;
 
         const where: any = { tenantId };
 
@@ -28,29 +27,26 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        const [customers, total] = await Promise.all([
-            prisma.customer.findMany({
-                where,
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-                include: {
-                    _count: {
-                        select: { orders: true }
-                    }
+        const customers = await prisma.customer.findMany({
+            where,
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+            orderBy: { createdAt: 'desc' },
+            include: {
+                _count: {
+                    select: { orders: true }
                 }
-            }),
-            prisma.customer.count({ where })
-        ]);
+            }
+        });
+
+        const hasMore = customers.length > limit;
+        const data = hasMore ? customers.slice(0, limit) : customers;
+        const nextCursor = hasMore ? data[data.length - 1].id : null;
 
         return NextResponse.json({
-            customers,
-            pagination: {
-                total,
-                pages: Math.ceil(total / limit),
-                page,
-                limit,
-            },
+            customers: data,
+            nextCursor,
+            hasMore,
         });
     } catch (error) {
         console.error("Failed to fetch customers:", error);

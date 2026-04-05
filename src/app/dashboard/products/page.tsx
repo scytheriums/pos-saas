@@ -58,9 +58,9 @@ interface Product {
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<Product[]>([]);
-    const [page, setPage] = useState(1);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
     const limit = 20;
-    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -94,25 +94,20 @@ export default function ProductsPage() {
         setPendingStockFilter('ALL');
     };
 
-    const fetchProducts = async (pageNumber: number, search: string, reset: boolean = false) => {
+    const fetchProducts = async (overrideCursor?: string | null, reset: boolean = false, searchOverride?: string) => {
         try {
-            const params = new URLSearchParams({
-                page: pageNumber.toString(),
-                limit: limit.toString(),
-            });
-            if (search) {
-                params.append('search', search);
-            }
+            const activeSearch = searchOverride !== undefined ? searchOverride : debouncedSearch;
+            const params = new URLSearchParams({ limit: limit.toString() });
+            const activeCursor = overrideCursor !== undefined ? overrideCursor : cursor;
+            if (activeCursor) params.append('cursor', activeCursor);
+            if (activeSearch) params.append('search', activeSearch);
 
             const response = await fetch(`/api/products?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch products');
-            }
+            if (!response.ok) throw new Error('Failed to fetch products');
             const data = await response.json();
-            // data: { products, total, page, limit }
             setProducts(prev => reset ? data.products : [...prev, ...data.products]);
-            setTotal(data.total);
-            setPage(data.page);
+            setHasMore(data.hasMore);
+            setCursor(data.nextCursor ?? null);
         } catch (err) {
             console.error('Error fetching products:', err);
             setError('Failed to load products');
@@ -123,21 +118,20 @@ export default function ProductsPage() {
 
     // Initial load
     useEffect(() => {
-        fetchProducts(1, '', true);
+        fetchProducts(null, true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Search effect
     useEffect(() => {
-        // Reset page to 1 when search changes
-        setPage(1);
-        fetchProducts(1, debouncedSearch, true);
+        setCursor(null);
+        fetchProducts(null, true, debouncedSearch);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [debouncedSearch]);
 
     const loadMore = () => {
-        if (products.length < total) {
-            fetchProducts(page + 1, debouncedSearch, false);
+        if (hasMore && cursor) {
+            fetchProducts(cursor, false);
         }
     };
 
@@ -293,7 +287,7 @@ export default function ProductsPage() {
                         </div>
                         <div className="min-w-0">
                             <p className="text-[11px] text-muted-foreground leading-none">Total Products</p>
-                            <p className="text-lg font-bold leading-none mt-1">{total}</p>
+                            <p className="text-lg font-bold leading-none mt-1">{products.length}{hasMore ? '+' : ''}</p>
                         </div>
                     </div>
                 </Card>
@@ -439,7 +433,7 @@ export default function ProductsPage() {
             )}
 
             {/* Load More */}
-            {products.length < total && (
+            {hasMore && (
                 <div className="flex justify-center">
                     <Button variant="outline" size="sm" onClick={loadMore} disabled={loading}>
                         {loading ? 'Loading...' : 'Load More'}

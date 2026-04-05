@@ -3,6 +3,34 @@
 // Cookie set by Better Auth on every authenticated session
 const SESSION_COOKIE = "better-auth.session_token";
 
+// ---------------------------------------------------------------------------
+// In-memory rate limiter (Edge-compatible, per-instance).
+// For multi-instance deployments replace with Upstash Redis.
+// ---------------------------------------------------------------------------
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimit(key: string, limit: number, windowMs: number): { allowed: boolean; resetAt: number } {
+    const now = Date.now();
+    const entry = rateLimitStore.get(key);
+    if (!entry || now > entry.resetAt) {
+        rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+        return { allowed: true, resetAt: now + windowMs };
+    }
+    if (entry.count >= limit) {
+        return { allowed: false, resetAt: entry.resetAt };
+    }
+    entry.count += 1;
+    return { allowed: true, resetAt: entry.resetAt };
+}
+
+function getIP(req: NextRequest): string {
+    return (
+        req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+        req.headers.get('x-real-ip') ??
+        'unknown'
+    );
+}
+
 const PUBLIC_PATHS = [
     '/sign-in',
     '/sign-up',
@@ -19,6 +47,33 @@ function isPublicPath(pathname: string): boolean {
 
 export async function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
+    const method = req.method;
+    const ip = getIP(req);
+
+    // --- Rate limits ---
+    if (pathname === '/api/auth/sign-in' && method === 'POST') {
+        const r = rateLimit(`signin:${ip}`, 10, 15 * 60 * 1000);
+        if (!r.allowed) return NextResponse.json(
+            { error: 'Too many sign-in attempts. Please try again later.' },
+            { status: 429, headers: { 'Retry-After': Math.ceil((r.resetAt - Date.now()) / 1000).toString(), 'X-RateLimit-Limit': '10', 'X-RateLimit-Remaining': '0' } }
+        );
+    }
+
+    if (pathname === '/api/auth/sign-up' && method === 'POST') {
+        const r = rateLimit(`signup:${ip}`, 5, 60 * 60 * 1000);
+        if (!r.allowed) return NextResponse.json(
+            { error: 'Too many sign-up attempts. Please try again later.' },
+            { status: 429, headers: { 'Retry-After': Math.ceil((r.resetAt - Date.now()) / 1000).toString(), 'X-RateLimit-Limit': '5', 'X-RateLimit-Remaining': '0' } }
+        );
+    }
+
+    if (pathname === '/api/orders' && method === 'POST') {
+        const r = rateLimit(`orders:${ip}`, 60, 60 * 1000);
+        if (!r.allowed) return NextResponse.json(
+            { error: 'Too many requests. Please slow down.' },
+            { status: 429, headers: { 'Retry-After': Math.ceil((r.resetAt - Date.now()) / 1000).toString(), 'X-RateLimit-Limit': '60', 'X-RateLimit-Remaining': '0' } }
+        );
+    }
 
     if (isPublicPath(pathname)) {
         return NextResponse.next();

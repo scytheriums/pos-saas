@@ -15,14 +15,13 @@ export async function GET(req: NextRequest) {
 
         // Parse query parameters
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') ?? '1', 10);
-        const limit = parseInt(searchParams.get('limit') ?? '20', 10);
-        const status = searchParams.get('status'); // PENDING, COMPLETED, REFUNDED, CANCELLED
+        const cursor = searchParams.get('cursor');
+        const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
+        const status = searchParams.get('status');
         const paymentMethod = searchParams.get('paymentMethod');
-        const search = searchParams.get('search'); // Search by customer name or order ID
+        const search = searchParams.get('search');
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
-        const skip = (page - 1) * limit;
 
         // Build where clause
         const where: any = {
@@ -43,61 +42,62 @@ export async function GET(req: NextRequest) {
             } : {})
         };
 
-        // Fetch orders with pagination
-        const [orders, total] = await Promise.all([
-            prisma.order.findMany({
-                where: {
-                    tenantId
+        const orders = await prisma.order.findMany({
+            where,
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                total: true,
+                createdAt: true,
+                status: true,
+                paymentMethod: true,
+                customerName: true,
+                customer: {
+                    select: {
+                        name: true,
+                        email: true,
+                        phone: true
+                    }
                 },
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-                select: {
-                    id: true,
-                    total: true,
-                    createdAt: true,
-                    status: true,
-                    paymentMethod: true,
-                    customerName: true,
-                    customer: {
-                        select: {
-                            name: true,
-                            email: true,
-                            phone: true
-                        }
-                    },
-                    cashierName: true,
-                    notes: true,
-                    items: {
-                        select: {
-                            id: true,
-                            quantity: true,
-                            price: true,
-                            variant: {
-                                select: {
-                                    sku: true,
-                                    product: {
-                                        select: {
-                                            name: true
-                                        }
+                cashierName: true,
+                notes: true,
+                paymentEntries: {
+                    select: {
+                        id: true,
+                        method: true,
+                        amount: true,
+                    }
+                },
+                items: {
+                    select: {
+                        id: true,
+                        quantity: true,
+                        price: true,
+                        variant: {
+                            select: {
+                                sku: true,
+                                product: {
+                                    select: {
+                                        name: true
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }),
-            prisma.order.count({ where: { tenantId } })
-        ]);
+            }
+        });
+
+        const hasMore = orders.length > limit;
+        const data = hasMore ? orders.slice(0, limit) : orders;
+        const nextCursor = hasMore ? data[data.length - 1].id : null;
 
         return NextResponse.json({
-            orders,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit)
-            }
+            orders: data,
+            nextCursor,
+            hasMore,
         });
     } catch (error) {
         console.error("Error fetching orders:", error);
@@ -119,13 +119,29 @@ export async function POST(req: NextRequest) {
         const { tenantId, name: cashierName } = authResult.user;
 
         const body = await req.json();
-        const { items, total, paymentMethod, cashTendered, change, customerName, customerId, discountId, discountAmount } = body;
+        const { items, total, paymentMethod, cashTendered, change, customerName, customerId, discountId, discountAmount, paymentEntries, shiftId, redeemPoints } = body;
 
         if (!items || items.length === 0) {
             return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
         }
 
+        // Validate payment entries if provided
+        if (paymentEntries && paymentEntries.length > 0) {
+            const entriesTotal = paymentEntries.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+            if (entriesTotal < Number(total)) {
+                return NextResponse.json({ error: "Payment entries do not cover the total" }, { status: 400 });
+            }
+        }
+
         const result = await prisma.$transaction(async (tx) => {
+            // 0. Load tenant loyalty settings
+            const tenantSettings = await tx.tenant.findUnique({
+                where: { id: tenantId },
+                select: { pointsPerCurrency: true, pointRedemptionRate: true, minimumRedeemPoints: true },
+            });
+            const pointsPerCurrency = Number(tenantSettings?.pointsPerCurrency ?? 0);
+            const pointRedemptionRate = Number(tenantSettings?.pointRedemptionRate ?? 0);
+            const minimumRedeemPoints = Number(tenantSettings?.minimumRedeemPoints ?? 0);
             // 1. Validate Stock Availability and fetch variant data
             const stockWarnings: string[] = [];
             const stockErrors: string[] = [];
@@ -185,12 +201,14 @@ export async function POST(req: NextRequest) {
             }
 
             // 2. Create Order
+            // Derive legacy fields from paymentEntries when provided
+            const primaryMethod = paymentEntries?.length > 0 ? paymentEntries[0].method : paymentMethod;
             const order = await tx.order.create({
                 data: {
                     total: new Prisma.Decimal(total),
                     status: "COMPLETED",
                     tenantId,
-                    paymentMethod: paymentMethod,
+                    paymentMethod: primaryMethod,
                     cashTendered: cashTendered ? new Prisma.Decimal(cashTendered) : null,
                     change: change ? new Prisma.Decimal(change) : null,
                     customerName: customerName,
@@ -198,6 +216,7 @@ export async function POST(req: NextRequest) {
                     customerId: customerId || null,
                     discountId: discountId || null,
                     discountAmount: discountAmount ? new Prisma.Decimal(discountAmount) : new Prisma.Decimal(0),
+                    shiftId: shiftId || null,
                     items: {
                         create: items.map((item: any) => {
                             const variantId = item.variantId || item.id;
@@ -210,10 +229,21 @@ export async function POST(req: NextRequest) {
                                 itemDiscount: new Prisma.Decimal(item.itemDiscount || 0),
                             };
                         })
+                    },
+                    // Create payment entries (split payments)
+                    paymentEntries: paymentEntries?.length > 0 ? {
+                        create: paymentEntries.map((e: any) => ({
+                            method: e.method,
+                            amount: new Prisma.Decimal(e.amount),
+                        }))
+                    } : {
+                        // Legacy single-method — still create an entry for consistency
+                        create: [{ method: primaryMethod, amount: new Prisma.Decimal(total) }]
                     }
                 },
                 include: {
-                    items: true
+                    items: true,
+                    paymentEntries: true,
                 }
             });
 
@@ -230,7 +260,30 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            return { order, stockWarnings };
+            // 4. Loyalty points — redeem and/or award
+            let pointsEarned = 0;
+            if (customerId) {
+                const customer = await tx.customer.findFirst({ where: { id: customerId, tenantId }, select: { points: true } });
+                if (customer) {
+                    // Redeem points
+                    const pointsToRedeem = redeemPoints && pointRedemptionRate > 0 && redeemPoints >= minimumRedeemPoints
+                        ? Math.min(Math.floor(redeemPoints), customer.points)
+                        : 0;
+
+                    // Award points for this purchase (based on grand total)
+                    pointsEarned = pointsPerCurrency > 0 ? Math.floor(Number(total) * pointsPerCurrency) : 0;
+
+                    const pointsDelta = pointsEarned - pointsToRedeem;
+                    if (pointsDelta !== 0) {
+                        await tx.customer.update({
+                            where: { id: customerId },
+                            data: { points: { increment: pointsDelta } },
+                        });
+                    }
+                }
+            }
+
+            return { order, stockWarnings, pointsEarned };
         });
 
         // Log audit trail

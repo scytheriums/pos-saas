@@ -41,26 +41,30 @@ interface Return {
 export default function ReturnsPage() {
     const [returns, setReturns] = useState<Return[]>([]);
     const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [total, setTotal] = useState(0);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
+    const [hasMore, setHasMore] = useState(false);
+    const page = cursorHistory.length + 1;
 
     // Filters
     const [statusFilter, setStatusFilter] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
+        // Reset cursor when filter changes
+        setCursor(null);
+        setCursorHistory([]);
+    }, [statusFilter]);
+
+    useEffect(() => {
         fetchReturns();
-    }, [page, statusFilter]);
+    }, [cursor, statusFilter]);
 
     const fetchReturns = async () => {
         try {
             setLoading(true);
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: "20"
-            });
-
+            const params = new URLSearchParams({ limit: "20" });
+            if (cursor) params.append("cursor", cursor);
             if (statusFilter && statusFilter !== "all") params.append("status", statusFilter);
 
             const response = await fetch(`/api/returns?${params}`);
@@ -68,13 +72,27 @@ export default function ReturnsPage() {
 
             const data = await response.json();
             setReturns(data.returns);
-            setTotalPages(data.pagination.totalPages);
-            setTotal(data.pagination.total);
+            setHasMore(data.hasMore);
         } catch (error) {
             console.error("Error fetching returns:", error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const goToNextPage = () => {
+        const lastId = returns[returns.length - 1]?.id;
+        if (lastId && hasMore) {
+            setCursorHistory(h => [...h, cursor]);
+            setCursor(lastId);
+        }
+    };
+
+    const goToPrevPage = () => {
+        if (cursorHistory.length === 0) return;
+        const prev = cursorHistory[cursorHistory.length - 1];
+        setCursorHistory(h => h.slice(0, -1));
+        setCursor(prev);
     };
 
     const handleApprove = async (returnId: string) => {
@@ -216,7 +234,7 @@ export default function ReturnsPage() {
             {/* Returns Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Returns ({total} total)</CardTitle>
+                    <CardTitle>Returns</CardTitle>
                     <CardDescription>Showing {filteredReturns.length} of {returns.length} returns on this page</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -321,14 +339,14 @@ export default function ReturnsPage() {
                             {/* Pagination */}
                             <div className="flex items-center justify-between mt-4">
                                 <div className="text-sm text-muted-foreground">
-                                    Page {page} of {totalPages}
+                                    Page {page}
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        disabled={page === 1}
+                                        onClick={goToPrevPage}
+                                        disabled={cursorHistory.length === 0}
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                         Previous
@@ -336,8 +354,8 @@ export default function ReturnsPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={page === totalPages}
+                                        onClick={goToNextPage}
+                                        disabled={!hasMore}
                                     >
                                         Next
                                         <ChevronRight className="h-4 w-4" />

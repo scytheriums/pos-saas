@@ -23,6 +23,9 @@ interface ReceiptProps {
     total: number;
     discountAmount?: number;
     discountName?: string;
+    redeemDiscount?: number;
+    pointsEarned?: number;
+    paymentEntries?: { method: string; amount: number }[];
     headerText?: string;
     footerText?: string;
     showLogo?: boolean;
@@ -31,7 +34,7 @@ interface ReceiptProps {
 }
 
 export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
-    ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, headerText, footerText, showLogo, logoUrl, isPreview }, ref) => {
+    ({ storeName, storeAddress, storePhone, orderId, date, cashierName, items, subtotal, tax, total, discountAmount, discountName, redeemDiscount, pointsEarned, paymentEntries, headerText, footerText, showLogo, logoUrl, isPreview }, ref) => {
         const settings = useTenantSettings();
         const fmt = (n: number) =>
             new Intl.NumberFormat(settings.currency === 'IDR' ? 'id-ID' : 'en-US', {
@@ -128,6 +131,12 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                             <span>-{fmt(discountAmount!)}</span>
                         </div>
                     )}
+                    {(redeemDiscount ?? 0) > 0 && (
+                        <div className="flex justify-between font-medium">
+                            <span>Points Redeemed</span>
+                            <span>-{fmt(redeemDiscount!)}</span>
+                        </div>
+                    )}
                     {(() => {
                         const totalItemDiscount = items.reduce((sum, item) => sum + (item.itemDiscount || 0), 0);
                         return totalItemDiscount > 0 ? (
@@ -141,7 +150,34 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptProps>(
                         <span>Total</span>
                         <span>{fmt(total)}</span>
                     </div>
+                    {/* Payment breakdown */}
+                    {paymentEntries && paymentEntries.length > 0 && (
+                        <>
+                            <div className="mt-1 pt-1 border-t border-dashed border-black">
+                                {paymentEntries.map((entry, i) => (
+                                    <div key={i} className="flex justify-between text-[9px]">
+                                        <span>{entry.method.replace('_', ' ')}</span>
+                                        <span>{fmt(entry.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            {paymentEntries.reduce((s, e) => s + e.amount, 0) > total && (
+                                <div className="flex justify-between text-[9px] font-bold">
+                                    <span>Change</span>
+                                    <span>{fmt(paymentEntries.reduce((s, e) => s + e.amount, 0) - total)}</span>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
+
+                {/* Points Earned */}
+                {(pointsEarned ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px] font-bold mb-4">
+                        <span>&#x2B50; Points Earned</span>
+                        <span>+{pointsEarned}</span>
+                    </div>
+                )}
 
                 {/* Footer */}
                 <div className="text-center text-[9px]">

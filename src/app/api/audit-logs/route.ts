@@ -26,8 +26,8 @@ export async function GET(req: NextRequest) {
         const resource = searchParams.get('resource');
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
-        const limit = parseInt(searchParams.get('limit') || '50');
-        const offset = parseInt(searchParams.get('offset') || '0');
+        const cursor = searchParams.get('cursor');
+        const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 200);
 
         const where: any = { tenantId };
         if (userId) where.userId = userId;
@@ -39,36 +39,30 @@ export async function GET(req: NextRequest) {
             if (endDate) where.createdAt.lte = new Date(endDate);
         }
 
-        const [logs, total] = await Promise.all([
-            prisma.auditLog.findMany({
-                where,
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true
-                        }
+        const logs = await prisma.auditLog.findMany({
+            where,
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
                     }
-                },
-                orderBy: {
-                    createdAt: 'desc'
-                },
-                take: limit,
-                skip: offset
-            }),
-            prisma.auditLog.count({ where })
-        ]);
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
 
-        const page = Math.floor(offset / limit) + 1;
+        const hasMore = logs.length > limit;
+        const data = hasMore ? logs.slice(0, limit) : logs;
+        const nextCursor = hasMore ? data[data.length - 1].id : null;
+
         return NextResponse.json({
-            logs,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit)
-            }
+            logs: data,
+            nextCursor,
+            hasMore,
         });
     } catch (error) {
         console.error('Failed to fetch audit logs:', error);

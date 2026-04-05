@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2, Tag } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2, Tag, Timer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PaymentMethodSelector } from "@/components/pos/PaymentMethodSelector";
+import { OpenShiftModal, CloseShiftModal, type Shift } from "@/components/pos/ShiftModal";
 import { OfflineIndicator } from "@/components/pos/OfflineIndicator";
 import { db } from "@/lib/db";
 import Link from "next/link";
@@ -85,6 +86,9 @@ export default function POSPage() {
     const [discountError, setDiscountError] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; email?: string } | null>(null);
     const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
+    const [customerPoints, setCustomerPoints] = useState<number | null>(null);
+    const [redeemPointsInput, setRedeemPointsInput] = useState("");
+    const [redeemDiscount, setRedeemDiscount] = useState(0);
 
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -92,6 +96,9 @@ export default function POSPage() {
     const [tenant, setTenant] = useState<any>(null);
     const [cartMounted, setCartMounted] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
+    const [activeShift, setActiveShift] = useState<Shift | null>(null);
+    const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
+    const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
     const cartDrawerRef = useRef<HTMLDivElement>(null);
     const cartTouchStartY = useRef(0);
 
@@ -124,6 +131,26 @@ export default function POSPage() {
     // Mark as mounted on client side
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    // Check for an active shift on mount
+    useEffect(() => {
+        async function checkShift() {
+            try {
+                const res = await fetch('/api/shifts?status=OPEN&limit=1');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.data && data.data.length > 0) {
+                        setActiveShift(data.data[0]);
+                    } else {
+                        setShowOpenShiftModal(true);
+                    }
+                }
+            } catch {
+                // Offline or error — allow POS to work without shift
+            }
+        }
+        checkShift();
     }, []);
 
     // Reset pagination when search query changes
@@ -297,7 +324,41 @@ export default function POSPage() {
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity - (item.itemDiscount || 0), 0);
     const taxRate = (tenant?.taxRate ?? 0) / 100;
     const tax = total * taxRate;
-    const grandTotal = total + tax - discountAmount;
+    const grandTotal = total + tax - discountAmount - redeemDiscount;
+
+    // When customer changes, fetch their points balance
+    const handleSelectCustomer = async (customer: { id: string; name: string; email?: string } | null) => {
+        setSelectedCustomer(customer);
+        setCustomerPoints(null);
+        setRedeemPointsInput("");
+        setRedeemDiscount(0);
+        if (customer) {
+            try {
+                const res = await fetch(`/api/customers/${customer.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setCustomerPoints(data.customer?.points ?? data.points ?? 0);
+                }
+            } catch {
+                // Points display is optional — continue without it
+            }
+        }
+    };
+
+    const applyRedeemPoints = () => {
+        const pts = parseInt(redeemPointsInput) || 0;
+        const rate = settings.pointRedemptionRate ?? 0;
+        const minPts = settings.minimumRedeemPoints ?? 0;
+        const maxPts = customerPoints ?? 0;
+        if (pts < minPts || rate === 0) return;
+        const capped = Math.min(pts, maxPts);
+        setRedeemDiscount(Math.floor(capped * rate));
+    };
+
+    const removeRedeemPoints = () => {
+        setRedeemPointsInput("");
+        setRedeemDiscount(0);
+    };
 
     const applyDiscount = async () => {
         if (!discountCode.trim()) return;
@@ -404,7 +465,7 @@ export default function POSPage() {
         if (delta > 80) closeMobileCart();
     };
 
-    const processSuccessfulOrder = (orderId: string, cashierName: string, isOffline = false) => {
+    const processSuccessfulOrder = (orderId: string, cashierName: string, isOffline = false, paymentEntries?: { method: string; amount: number }[], pointsEarned = 0) => {
         setLastOrder({
             orderId: orderId,
             date: new Date(),
@@ -420,7 +481,10 @@ export default function POSPage() {
             tax: tax,
             total: grandTotal,
             discountAmount: discountAmount,
-            discountName: appliedDiscount?.name
+            discountName: appliedDiscount?.name,
+            redeemDiscount: redeemDiscount > 0 ? redeemDiscount : undefined,
+            pointsEarned: pointsEarned > 0 ? pointsEarned : undefined,
+            paymentEntries,
         });
 
         if (settings.autoPrintReceipt) {
@@ -470,6 +534,9 @@ export default function POSPage() {
         setAppliedDiscount(null);
         setDiscountAmount(0);
         setSelectedCustomer(null);
+        setCustomerPoints(null);
+        setRedeemPointsInput("");
+        setRedeemDiscount(0);
     };
 
     const handleCheckout = () => {
@@ -477,9 +544,12 @@ export default function POSPage() {
         setShowPaymentSelector(true);
     };
 
-    const processCheckout = async (paymentMethod: string, cashTendered?: number, customerNameInput?: string) => {
+    const processCheckout = async (paymentEntries: { method: string; amount: number }[], cashTendered?: number) => {
         setLoading(true);
         setShowPaymentSelector(false);
+
+        const primaryMethod = paymentEntries[0]?.method ?? 'CASH';
+        const change = cashTendered ? cashTendered - grandTotal : undefined;
 
         const orderData = {
             items: cart.map(item => ({
@@ -491,12 +561,17 @@ export default function POSPage() {
             })),
             total: grandTotal,
             tenantId: "default-tenant",
-            paymentMethod,
+            paymentMethod: primaryMethod,
+            paymentEntries,
             cashTendered,
-            change: cashTendered ? cashTendered - grandTotal : undefined,
-            customerId: selectedCustomer?.id, // Use selected customer ID
+            change,
+            customerId: selectedCustomer?.id,
             discountId: appliedDiscount?.id,
-            discountAmount: discountAmount
+            discountAmount: discountAmount,
+            shiftId: activeShift?.id ?? null,
+            redeemPoints: redeemDiscount > 0 && settings.pointRedemptionRate > 0
+                ? Math.floor(redeemDiscount / settings.pointRedemptionRate)
+                : 0,
         };
 
         try {
@@ -509,7 +584,7 @@ export default function POSPage() {
 
                 if (!res.ok) throw new Error("Checkout failed");
                 const data = await res.json();
-                processSuccessfulOrder(data.order.id, "Current Cashier"); // Replace with actual cashier name
+                processSuccessfulOrder(data.order.id, "Current Cashier", false, paymentEntries, data.pointsEarned ?? 0); // Replace with actual cashier name
             } else {
                 // Offline fallback
                 const offlineId = await db.orders.add({
@@ -518,14 +593,14 @@ export default function POSPage() {
                     timestamp: Date.now(),
                     synced: false,
                     tenantId: orderData.tenantId,
-                    paymentMethod,
+                    paymentMethod: primaryMethod,
                     cashTendered,
                     change: orderData.change,
                     customerId: orderData.customerId,
                     discountId: orderData.discountId,
                     discountAmount: orderData.discountAmount
                 });
-                processSuccessfulOrder(`OFF-${offlineId}`, "Offline Cashier", true);
+                processSuccessfulOrder(`OFF-${offlineId}`, "Offline Cashier", true, paymentEntries);
             }
         } catch (error) {
             console.error("Checkout error:", error);
@@ -700,8 +775,47 @@ export default function POSPage() {
             <div className="p-2 md:p-3 lg:p-4 bg-white border-t space-y-2 md:space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <CustomerSelector
                     selectedCustomer={selectedCustomer}
-                    onSelectCustomer={setSelectedCustomer}
+                    onSelectCustomer={handleSelectCustomer}
                 />
+
+                {/* Customer Points Balance */}
+                {selectedCustomer && settings.pointsPerCurrency > 0 && customerPoints !== null && (
+                    <div className="flex items-center justify-between text-xs bg-yellow-50 border border-yellow-100 rounded-lg px-3 py-2">
+                        <span className="text-yellow-700 font-medium">⭐ {customerPoints.toLocaleString()} pts balance</span>
+                        {settings.pointRedemptionRate > 0 && customerPoints >= settings.minimumRedeemPoints && customerPoints > 0 && (
+                            <span className="text-yellow-600 text-[10px]">
+                                Max -{formatCurrencyWithSettings(Math.floor(customerPoints * settings.pointRedemptionRate), settings)} off
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Points Redemption */}
+                {selectedCustomer && settings.pointRedemptionRate > 0 && customerPoints !== null && customerPoints >= settings.minimumRedeemPoints && customerPoints > 0 && (
+                    <div className="flex gap-2 items-center">
+                        <Input
+                            type="number"
+                            placeholder={`Redeem points (max ${customerPoints})`}
+                            value={redeemPointsInput}
+                            onChange={(e) => {
+                                const val = Math.min(parseInt(e.target.value) || 0, customerPoints);
+                                setRedeemPointsInput(val > 0 ? val.toString() : "");
+                                setRedeemDiscount(val > 0 ? Math.floor(val * settings.pointRedemptionRate) : 0);
+                            }}
+                            className="h-9 text-xs flex-1"
+                        />
+                        {redeemDiscount > 0 && (
+                            <span className="text-green-600 text-xs font-semibold whitespace-nowrap">
+                                -{formatCurrencyWithSettings(redeemDiscount, settings)}
+                            </span>
+                        )}
+                        {redeemPointsInput && (
+                            <button onClick={removeRedeemPoints} className="text-red-400 hover:text-red-600">
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 <div className="space-y-1">
                     <div className="flex justify-between text-sm">
@@ -758,11 +872,32 @@ export default function POSPage() {
                         </div>
                     )}
 
+                    {redeemDiscount > 0 && (
+                        <div className="flex justify-between items-center text-sm rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-purple-700 font-medium text-xs">⭐ Points Redeemed</span>
+                                <button
+                                    onClick={removeRedeemPoints}
+                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <span className="font-semibold text-purple-700">-{formatCurrencyWithSettings(redeemDiscount, settings)}</span>
+                        </div>
+                    )}
+
                     <div className="flex justify-between items-center pt-2 md:pt-3 border-t border-dashed">
                         <span className="text-sm md:text-base font-semibold text-gray-700">{t.pos.total}</span>
                         <span className="text-lg md:text-2xl font-bold text-primary">{formatCurrencyWithSettings(grandTotal, settings)}</span>
                     </div>
                 </div>
+
+                {settings.pointsPerCurrency > 0 && selectedCustomer && grandTotal > 0 && (
+                    <div className="text-[10px] text-yellow-600 text-center font-medium">
+                        +{Math.floor(grandTotal * settings.pointsPerCurrency)} pts will be earned
+                    </div>
+                )}
 
                 <Button
                     className="w-full h-10 md:h-12 text-sm md:text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl"
@@ -778,6 +913,25 @@ export default function POSPage() {
 
     return (
         <div className="h-screen bg-gray-50 flex overflow-hidden">
+            <OpenShiftModal
+                open={showOpenShiftModal}
+                onShiftOpened={(shift) => {
+                    setActiveShift(shift);
+                    setShowOpenShiftModal(false);
+                }}
+            />
+            {activeShift && (
+                <CloseShiftModal
+                    open={showCloseShiftModal}
+                    shift={activeShift}
+                    onClose={() => setShowCloseShiftModal(false)}
+                    onShiftClosed={() => {
+                        setActiveShift(null);
+                        setShowCloseShiftModal(false);
+                        setShowOpenShiftModal(true);
+                    }}
+                />
+            )}
             {isOwner && (
                 <div className="print:hidden h-full shrink-0 hidden xl:block">
                     <Sidebar />
@@ -836,6 +990,26 @@ export default function POSPage() {
                             <Globe className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">{language.toUpperCase()}</span>
                         </button>
+                        {/* Shift indicator / Close Shift */}
+                        {activeShift ? (
+                            <button
+                                className="flex items-center gap-1 px-2 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-semibold hover:bg-green-100 transition-colors"
+                                onClick={() => setShowCloseShiftModal(true)}
+                                title="Active shift — click to close"
+                            >
+                                <Timer className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Shift</span>
+                            </button>
+                        ) : (
+                            <button
+                                className="flex items-center gap-1 px-2 py-1.5 bg-yellow-50 text-yellow-700 rounded-full text-xs font-semibold hover:bg-yellow-100 transition-colors"
+                                onClick={() => setShowOpenShiftModal(true)}
+                                title="No active shift — click to open"
+                            >
+                                <Timer className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Open</span>
+                            </button>
+                        )}
                         {/* Avatar */}
                         <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold shadow-md shrink-0">
                             {tenant?.name?.substring(0, 2).toUpperCase() || 'ST'}

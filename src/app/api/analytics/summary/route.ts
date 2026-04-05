@@ -45,7 +45,17 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        const totalProfit = totalRevenue - totalCost;
+        // Aggregate expenses for the same period
+        const expenseAgg = await prisma.expense.aggregate({
+            where: {
+                tenantId,
+                date: { gte: startDate, lte: endDate },
+            },
+            _sum: { amount: true },
+        });
+        const totalExpenses = Number((expenseAgg._sum as any)?.amount ?? 0);
+
+        const totalProfit = totalRevenue - totalCost - totalExpenses;
         const margin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
         const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -55,6 +65,7 @@ export async function GET(req: NextRequest) {
             totalOrders,
             averageOrderValue,
             margin,
+            totalExpenses,
         });
 
     } catch (error) {

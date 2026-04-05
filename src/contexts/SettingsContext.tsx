@@ -27,6 +27,11 @@ export interface TenantSettings {
     timezone: string;
     dateFormat: string;
     timeFormat: string;
+
+    // Loyalty Settings
+    pointsPerCurrency: number;    // e.g. 1 = 1 point per Rp1
+    pointRedemptionRate: number;  // e.g. 0.01 = Rp0.01 discount per point
+    minimumRedeemPoints: number;  // min points to redeem
 }
 
 interface SettingsContextType {
@@ -49,6 +54,9 @@ const defaultSettings: TenantSettings = {
     timezone: 'Asia/Jakarta',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '24h',
+    pointsPerCurrency: 0,
+    pointRedemptionRate: 0,
+    minimumRedeemPoints: 0,
 };
 
 export function SettingsProvider({ children }: { children: ReactNode }) {

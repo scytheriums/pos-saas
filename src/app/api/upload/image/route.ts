@@ -5,9 +5,9 @@ import { saveImage } from '@/lib/upload';
 export async function POST(request: NextRequest) {
     try {
         // Authenticate user
-        const user = await getAuthUser();
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const authResult = await getAuthUser();
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
 
         // Get form data

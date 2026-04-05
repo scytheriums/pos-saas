@@ -24,6 +24,7 @@ interface OrderDetails {
         name: string;
         email?: string;
         phone?: string;
+        points?: number;
     } | null;
     cashierName: string | null;
     notes: string | null;
@@ -32,6 +33,7 @@ interface OrderDetails {
     discount?: {
         name: string;
     };
+    paymentEntries?: { id: string; method: string; amount: number }[];
     items: {
         id: string;
         quantity: number;
@@ -119,6 +121,13 @@ export default function OrderDetailsPage() {
         return labels[method] || method;
     };
 
+    const paymentEntries = order?.paymentEntries ?? [];
+    const primaryPayment = paymentEntries.length > 0
+        ? paymentEntries.map(e => getPaymentLabel(e.method)).join(' + ')
+        : getPaymentLabel(order?.paymentMethod ?? null);
+    const totalPaid = paymentEntries.reduce((s, e) => s + Number(e.amount), 0);
+    const change = totalPaid > Number(order?.total ?? 0) ? totalPaid - Number(order?.total ?? 0) : 0;
+
     if (loading) {
         return (
             <div className="p-6">
@@ -188,13 +197,20 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Payment Method</p>
-                                    <p className="mt-1 font-medium">{getPaymentLabel(order.paymentMethod)}</p>
+                                    <p className="mt-1 font-medium">{primaryPayment}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Customer</p>
-                                    <p className="mt-1 font-medium">
-                                        {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
-                                    </p>
+                                    <div className="mt-1">
+                                        <p className="font-medium">
+                                            {order.customer?.name || order.customerName || <span className="text-muted-foreground">Walk-in</span>}
+                                        </p>
+                                        {order.customer?.email && <p className="text-xs text-muted-foreground">{order.customer.email}</p>}
+                                        {order.customer?.phone && <p className="text-xs text-muted-foreground">{order.customer.phone}</p>}
+                                        {(order.customer?.points ?? 0) > 0 && (
+                                            <p className="text-xs text-yellow-600 font-medium mt-0.5">⭐ {order.customer!.points!.toLocaleString()} pts balance</p>
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Cashier</p>
@@ -230,13 +246,15 @@ export default function OrderDetailsPage() {
                                 <span className="text-muted-foreground">Subtotal</span>
                                 <span>{formatCurrencyWithSettings(subtotal, settings)}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Tax (11%)</span>
-                                <span>{formatCurrencyWithSettings(tax, settings)}</span>
-                            </div>
+                            {tax > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Tax ({tenant?.taxRate ?? 0}%)</span>
+                                    <span>{formatCurrencyWithSettings(tax, settings)}</span>
+                                </div>
+                            )}
                             {order.discountAmount && Number(order.discountAmount) > 0 && (
                                 <div className="flex justify-between text-sm text-green-600">
-                                    <span className="text-muted-foreground">Discount</span>
+                                    <span>{order.discount?.name ? `Discount (${order.discount.name})` : 'Discount'}</span>
                                     <span>-{formatCurrencyWithSettings(Number(order.discountAmount), settings)}</span>
                                 </div>
                             )}
@@ -245,6 +263,24 @@ export default function OrderDetailsPage() {
                                 <span>Total</span>
                                 <span>{formatCurrencyWithSettings(Number(order.total), settings)}</span>
                             </div>
+                            {/* Payment breakdown */}
+                            {paymentEntries.length > 0 && (
+                                <>
+                                    <Separator className="my-1" />
+                                    {paymentEntries.map((entry) => (
+                                        <div key={entry.id} className="flex justify-between text-sm">
+                                            <span className="text-muted-foreground">{getPaymentLabel(entry.method)}</span>
+                                            <span>{formatCurrencyWithSettings(Number(entry.amount), settings)}</span>
+                                        </div>
+                                    ))}
+                                    {change > 0 && (
+                                        <div className="flex justify-between text-sm font-medium text-green-600">
+                                            <span>Change</span>
+                                            <span>{formatCurrencyWithSettings(change, settings)}</span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -310,6 +346,7 @@ export default function OrderDetailsPage() {
                 total={Number(order.total)}
                 discountAmount={Number(order.discountAmount || 0)}
                 discountName={order.discount?.name}
+                paymentEntries={paymentEntries.length > 0 ? paymentEntries : undefined}
             />
         </>
     );

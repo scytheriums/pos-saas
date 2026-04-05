@@ -22,6 +22,9 @@ import {
     Globe,
     Shield,
     RotateCcw,
+    Timer,
+    Receipt,
+    Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -62,6 +65,8 @@ export function Sidebar() {
             children: [
                 { label: "All Orders", href: "/dashboard/orders", icon: Store },
                 { label: "Return", href: "/dashboard/returns", icon: RotateCcw },
+                { label: "Shifts", href: "/dashboard/shifts", icon: Timer },
+                { label: "Expenses", href: "/dashboard/expenses", icon: Receipt },
             ],
         },
         { icon: Percent, label: "Promotions", href: "/dashboard/promotions" },
@@ -77,6 +82,7 @@ export function Sidebar() {
                 { label: t.sidebar.customers, href: "/dashboard/customers", icon: Users },
                 { label: t.sidebar.team, href: "/dashboard/users", icon: UserCog },
                 { label: "Roles & Permissions", href: "/dashboard/settings/roles", icon: Shield },
+                { label: "Loyalty Program", href: "/dashboard/settings/loyalty", icon: Star },
                 { label: "Audit Log", href: "/dashboard/audit-logs", icon: BarChart3 },
             ],
         },

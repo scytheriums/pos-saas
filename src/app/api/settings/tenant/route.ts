@@ -40,6 +40,10 @@ export async function GET(req: NextRequest) {
                 timezone: true,
                 dateFormat: true,
                 timeFormat: true,
+                // Loyalty Settings
+                pointsPerCurrency: true,
+                pointRedemptionRate: true,
+                minimumRedeemPoints: true,
             }
         });
 
@@ -75,7 +79,9 @@ export async function PATCH(req: NextRequest) {
             // POS Settings
             autoPrintReceipt, soundEffects, barcodeScanner,
             // Localization Settings
-            language, currency, timezone, dateFormat, timeFormat
+            language, currency, timezone, dateFormat, timeFormat,
+            // Loyalty Settings
+            pointsPerCurrency, pointRedemptionRate, minimumRedeemPoints,
         } = body;
 
         const updatedTenant = await prisma.tenant.update({
@@ -102,6 +108,10 @@ export async function PATCH(req: NextRequest) {
                 timezone,
                 dateFormat,
                 timeFormat,
+                // Loyalty Settings
+                pointsPerCurrency: pointsPerCurrency !== undefined ? Number(pointsPerCurrency) : undefined,
+                pointRedemptionRate: pointRedemptionRate !== undefined ? Number(pointRedemptionRate) : undefined,
+                minimumRedeemPoints: minimumRedeemPoints !== undefined ? Number(minimumRedeemPoints) : undefined,
             }
         });
 

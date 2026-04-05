@@ -313,10 +313,9 @@ export async function GET(req: NextRequest) {
 
         // Pagination parameters
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') ?? '1', 10);
-        const limit = parseInt(searchParams.get('limit') ?? '20', 10);
+        const cursor = searchParams.get('cursor');
+        const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
         const search = searchParams.get('search');
-        const skip = (page - 1) * limit;
 
         const where: Prisma.ProductWhereInput = {
             tenantId,
@@ -328,59 +327,60 @@ export async function GET(req: NextRequest) {
             } : {})
         };
 
-        const [products, total] = await Promise.all([
-            prisma.product.findMany({
-                where,
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    imageUrl: true,
-                    minStock: true,
-                    categoryId: true,
-                    tenantId: true,
-                    createdAt: true,
-                    options: {
-                        select: {
-                            id: true,
-                            name: true,
-                            values: {
-                                select: {
-                                    id: true,
-                                    value: true
-                                }
+        const products = await prisma.product.findMany({
+            where,
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                imageUrl: true,
+                minStock: true,
+                categoryId: true,
+                tenantId: true,
+                createdAt: true,
+                options: {
+                    select: {
+                        id: true,
+                        name: true,
+                        values: {
+                            select: {
+                                id: true,
+                                value: true
                             }
                         }
-                    },
-                    variants: {
-                        select: {
-                            id: true,
-                            sku: true,
-                            price: true,
-                            stock: true,
-                            imageUrl: true,
-                            optionValues: {
-                                select: {
-                                    id: true,
-                                    value: true,
-                                    option: {
-                                        select: {
-                                            name: true
-                                        }
+                    }
+                },
+                variants: {
+                    select: {
+                        id: true,
+                        sku: true,
+                        price: true,
+                        stock: true,
+                        imageUrl: true,
+                        optionValues: {
+                            select: {
+                                id: true,
+                                value: true,
+                                option: {
+                                    select: {
+                                        name: true
                                     }
                                 }
                             }
                         }
                     }
-                },
-                orderBy: { createdAt: 'desc' },
-                skip,
-                take: limit,
-            }),
-            prisma.product.count({ where })
-        ]);
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
 
-        return NextResponse.json({ products, total, page, limit });
+        const hasMore = products.length > limit;
+        const data = hasMore ? products.slice(0, limit) : products;
+        const nextCursor = hasMore ? data[data.length - 1].id : null;
+
+        return NextResponse.json({ products: data, nextCursor, hasMore });
     } catch (error) {
         console.error("Error fetching products:", error);
         return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });

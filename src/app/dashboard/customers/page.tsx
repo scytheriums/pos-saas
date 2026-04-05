@@ -14,26 +14,28 @@ import { formatCurrency } from "@/lib/utils";
 export default function CustomersPage() {
     const [customers, setCustomers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
+    const [hasMore, setHasMore] = useState(false);
     const [search, setSearch] = useState("");
     const [dialogOpen, setDialogOpen] = useState(false);
+    const page = cursorHistory.length + 1;
 
     const debouncedSearch = useDebounce(search, 500);
 
-    const fetchCustomers = async () => {
+    const fetchCustomers = async (overrideCursor?: string | null) => {
         setLoading(true);
         try {
-            const params = new URLSearchParams();
-            params.append('page', page.toString());
-            params.append('limit', '20');
+            const params = new URLSearchParams({ limit: '20' });
+            const activeCursor = overrideCursor !== undefined ? overrideCursor : cursor;
+            if (activeCursor) params.append('cursor', activeCursor);
             if (debouncedSearch) params.append('search', debouncedSearch);
 
             const res = await fetch(`/api/customers?${params.toString()}`);
             if (res.ok) {
                 const data = await res.json();
                 setCustomers(data.customers);
-                setTotalPages(data.pagination.pages);
+                setHasMore(data.hasMore);
             }
         } catch (error) {
             console.error("Failed to fetch customers", error);
@@ -42,13 +44,30 @@ export default function CustomersPage() {
         }
     };
 
+    // Reset to first page when search changes
     useEffect(() => {
-        setPage(1);
+        setCursor(null);
+        setCursorHistory([]);
     }, [debouncedSearch]);
 
     useEffect(() => {
         fetchCustomers();
-    }, [page, debouncedSearch]);
+    }, [cursor, debouncedSearch]);
+
+    const goToNextPage = () => {
+        const lastId = customers[customers.length - 1]?.id;
+        if (lastId && hasMore) {
+            setCursorHistory(h => [...h, cursor]);
+            setCursor(lastId);
+        }
+    };
+
+    const goToPrevPage = () => {
+        if (cursorHistory.length === 0) return;
+        const prev = cursorHistory[cursorHistory.length - 1];
+        setCursorHistory(h => h.slice(0, -1));
+        setCursor(prev);
+    };
 
     return (
         <div className="p-6 space-y-6">
@@ -127,20 +146,20 @@ export default function CustomersPage() {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1 || loading}
+                            onClick={goToPrevPage}
+                            disabled={cursorHistory.length === 0 || loading}
                         >
                             <ChevronLeft className="h-4 w-4" />
                             Previous
                         </Button>
                         <div className="text-sm text-muted-foreground">
-                            Page {page} of {totalPages}
+                            Page {page}
                         </div>
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages || loading}
+                            onClick={goToNextPage}
+                            disabled={!hasMore || loading}
                         >
                             Next
                             <ChevronRight className="h-4 w-4" />

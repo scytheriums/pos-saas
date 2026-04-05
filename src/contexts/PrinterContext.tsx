@@ -255,6 +255,22 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
             }
             r.line(DIVIDER);
             r.bold(true).line(padRow('TOTAL', fmt(order.total))).bold(false);
+
+            // ── Payment breakdown (split payments) ──
+            if (order.paymentEntries && order.paymentEntries.length > 0) {
+                r.line(DIVIDER);
+                const methodLabels: Record<string, string> = {
+                    CASH: 'Cash', CARD: 'Card', E_WALLET: 'E-Wallet', BANK_TRANSFER: 'Bank Transfer',
+                };
+                order.paymentEntries.forEach((entry: { method: string; amount: number }) => {
+                    r.line(padRow(methodLabels[entry.method] || entry.method, fmt(entry.amount)));
+                });
+                const totalPaid = order.paymentEntries.reduce((s: number, e: { amount: number }) => s + e.amount, 0);
+                if (totalPaid > order.total) {
+                    r.line(padRow('Change', fmt(totalPaid - order.total)));
+                }
+            }
+
             r.line(DIVIDER);
 
             // ── Footer (mirrors ReceiptTemplate footer block) ──

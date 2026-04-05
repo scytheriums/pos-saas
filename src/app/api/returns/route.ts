@@ -14,13 +14,12 @@ export async function GET(req: NextRequest) {
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') ?? '1', 10);
-        const limit = parseInt(searchParams.get('limit') ?? '20', 10);
+        const cursor = searchParams.get('cursor');
+        const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
         const status = searchParams.get('status');
         const orderId = searchParams.get('orderId');
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
-        const skip = (page - 1) * limit;
 
         const where: Prisma.ReturnWhereInput = {
             tenantId,
@@ -34,11 +33,10 @@ export async function GET(req: NextRequest) {
             } : {})
         };
 
-        const [returns, total] = await Promise.all([
-            prisma.return.findMany({
+        const returns = await prisma.return.findMany({
                 where,
-                skip,
-                take: limit,
+                take: limit + 1,
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
                 orderBy: { createdAt: 'desc' },
                 include: {
                     order: {
@@ -71,18 +69,16 @@ export async function GET(req: NextRequest) {
                         }
                     }
                 }
-            }),
-            prisma.return.count({ where })
-        ]);
+            });
+
+        const hasMore = returns.length > limit;
+        const data = hasMore ? returns.slice(0, limit) : returns;
+        const nextCursor = hasMore ? data[data.length - 1].id : null;
 
         return NextResponse.json({
-            returns,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit)
-            }
+            returns: data,
+            nextCursor,
+            hasMore,
         });
     } catch (error) {
         console.error("Error fetching returns:", error);

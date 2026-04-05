@@ -19,6 +19,7 @@ interface Order {
     total: number;
     status: 'PENDING' | 'COMPLETED' | 'REFUNDED' | 'CANCELLED';
     paymentMethod: 'CASH' | 'CARD' | 'E_WALLET' | 'BANK_TRANSFER' | null;
+    paymentEntries?: { id: string; method: string; amount: number }[];
     customerName: string | null;
     customer?: {
         name: string;
@@ -49,9 +50,10 @@ export default function OrdersPage() {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [paymentFilter, setPaymentFilter] = useState('ALL');
     const [datePreset, setDatePreset] = useState('all');
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [total, setTotal] = useState(0);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
+    const [hasMore, setHasMore] = useState(false);
+    const page = cursorHistory.length + 1;
 
     // Popup filter state
     const [filterOpen, setFilterOpen] = useState(false);
@@ -82,7 +84,9 @@ export default function OrdersPage() {
         setStatusFilter(pendingStatus);
         setPaymentFilter(pendingPayment);
         setDatePreset(pendingDatePreset);
-        setPage(1);
+        // Reset cursor pagination on filter change
+        setCursor(null);
+        setCursorHistory([]);
         setFilterOpen(false);
     };
 
@@ -95,16 +99,13 @@ export default function OrdersPage() {
 
     useEffect(() => {
         fetchOrders();
-    }, [page, statusFilter, paymentFilter, search, datePreset]);
+    }, [cursor, statusFilter, paymentFilter, search, datePreset]);
 
     const fetchOrders = async () => {
         setLoading(true);
         try {
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: '20',
-            });
-
+            const params = new URLSearchParams({ limit: '20' });
+            if (cursor) params.set('cursor', cursor);
             if (statusFilter !== 'ALL') params.set('status', statusFilter);
             if (paymentFilter !== 'ALL') params.set('paymentMethod', paymentFilter);
             if (search) params.set('search', search);
@@ -116,14 +117,28 @@ export default function OrdersPage() {
             if (res.ok) {
                 const data = await res.json();
                 setOrders(data.orders);
-                setTotalPages(data.pagination.totalPages);
-                setTotal(data.pagination.total);
+                setHasMore(data.hasMore);
             }
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const goToNextPage = () => {
+        const lastId = orders[orders.length - 1]?.id;
+        if (lastId && hasMore) {
+            setCursorHistory(h => [...h, cursor]);
+            setCursor(lastId);
+        }
+    };
+
+    const goToPrevPage = () => {
+        if (cursorHistory.length === 0) return;
+        const prev = cursorHistory[cursorHistory.length - 1];
+        setCursorHistory(h => h.slice(0, -1));
+        setCursor(prev);
     };
 
     const getStatusBadge = (status: string) => {
@@ -136,14 +151,24 @@ export default function OrdersPage() {
         return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
     };
 
-    const getPaymentMethodBadge = (method: string | null) => {
-        if (!method) return <span className="text-muted-foreground">-</span>;
+    const getPaymentMethodBadge = (order: Order) => {
         const labels: Record<string, string> = {
-            CASH: 'Cash',
-            CARD: 'Card',
-            E_WALLET: 'E-Wallet',
-            BANK_TRANSFER: 'Bank Transfer',
+            CASH: 'Cash', CARD: 'Card', E_WALLET: 'E-Wallet', BANK_TRANSFER: 'Bank Transfer',
         };
+        // Show individual entries for split payments
+        if (order.paymentEntries && order.paymentEntries.length > 1) {
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {order.paymentEntries.map(e => (
+                        <Badge key={e.id} variant="outline" className="text-[10px] px-1.5 py-0">
+                            {labels[e.method] || e.method}
+                        </Badge>
+                    ))}
+                </div>
+            );
+        }
+        const method = order.paymentEntries?.[0]?.method ?? order.paymentMethod;
+        if (!method) return <span className="text-muted-foreground">-</span>;
         return <Badge variant="outline">{labels[method] || method}</Badge>;
     };
 
@@ -256,7 +281,7 @@ export default function OrdersPage() {
                         </div>
                         <div className="min-w-0">
                             <p className="text-[11px] text-muted-foreground leading-none">Total Orders</p>
-                            <p className="text-lg font-bold leading-none mt-1">{total}</p>
+                            <p className="text-lg font-bold leading-none mt-1">{orders.length}{hasMore ? '+' : ''}</p>
                         </div>
                     </div>
                 </Card>
@@ -332,7 +357,7 @@ export default function OrdersPage() {
                                 </div>
                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed">
                                     <div className="flex items-center gap-2">
-                                        {getPaymentMethodBadge(order.paymentMethod)}
+                                    {getPaymentMethodBadge(order)}
                                         <span className="text-xs text-muted-foreground">{order.items.length} items</span>
                                     </div>
                                     <Link href={`/dashboard/orders/${order.id}`}>
@@ -388,7 +413,7 @@ export default function OrdersPage() {
                                         </TableCell>
                                         <TableCell>{order.items.length} items</TableCell>
                                         <TableCell className="font-semibold">{formatCurrencyWithSettings(Number(order.total), settings)}</TableCell>
-                                        <TableCell>{getPaymentMethodBadge(order.paymentMethod)}</TableCell>
+                                        <TableCell>{getPaymentMethodBadge(order)}</TableCell>
                                         <TableCell>{getStatusBadge(order.status)}</TableCell>
                                         <TableCell>
                                             <Link href={`/dashboard/orders/${order.id}`}>
@@ -406,14 +431,14 @@ export default function OrdersPage() {
             </Card>
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {(cursorHistory.length > 0 || hasMore) && (
                 <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
+                    <p className="text-xs text-muted-foreground">Page {page}</p>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                        <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={cursorHistory.length === 0}>
                             Previous
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                        <Button variant="outline" size="sm" onClick={goToNextPage} disabled={!hasMore}>
                             Next
                         </Button>
                     </div>

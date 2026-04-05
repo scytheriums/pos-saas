@@ -89,6 +89,11 @@ model Tenant {
   skuPrefix       String?
   skuCounter      Int     @default(1)
 
+  // Loyalty Program Settings
+  pointsPerCurrency    Decimal @default(0) @db.Decimal(10, 4) // Points earned per 1 unit of currency
+  pointRedemptionRate  Decimal @default(0) @db.Decimal(10, 4) // Discount per 1 point redeemed
+  minimumRedeemPoints  Int     @default(0)  // Minimum points required to redeem
+
   users            User[]
   roles            UserRole[]
   products         Product[]
@@ -101,6 +106,8 @@ model Tenant {
   auditLogs        AuditLog[]
   returns          Return[]
   invitations      Invitation[]
+  shifts           Shift[]
+  expenses         Expense[]
 }
 
 model User {
@@ -119,6 +126,8 @@ model User {
   accounts      Account[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  shifts        Shift[]
+  expenses      Expense[]
 
   @@index([tenantId])
 }
@@ -307,7 +316,7 @@ model Order {
   id            String         @id @default(cuid())
   total         Decimal
   status        OrderStatus    @default(COMPLETED)
-  paymentMethod PaymentMethod?
+  paymentMethod PaymentMethod? // Legacy single-method field (kept for backward compat)
   cashTendered  Decimal?
   change        Decimal?
   customerName  String?
@@ -316,6 +325,9 @@ model Order {
   tenantId      String
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   items         OrderItem[]
+  paymentEntries PaymentEntry[]
+  shiftId       String?
+  shift         Shift?         @relation(fields: [shiftId], references: [id])
   customerId    String?
   customer       Customer?      @relation(fields: [customerId], references: [id])
   discountId     String?
@@ -323,6 +335,41 @@ model Order {
   discountAmount Decimal?
   returns        Return[]
   createdAt      DateTime       @default(now())
+}
+
+model PaymentEntry {
+  id       String        @id @default(cuid())
+  orderId  String
+  order    Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method   PaymentMethod
+  amount   Decimal
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+model Shift {
+  id             String      @id @default(cuid())
+  status         ShiftStatus @default(OPEN)
+  openedAt       DateTime    @default(now())
+  closedAt       DateTime?
+  openingFloat   Decimal     @default(0)  // Cash in drawer at open
+  expectedCash   Decimal?                 // Calculated: float + cash sales
+  actualCash     Decimal?                 // Counted by cashier at close
+  difference     Decimal?                 // actualCash - expectedCash
+  notes          String?
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id])
+  orders         Order[]
+  createdAt      DateTime    @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
 }
 
 model OrderItem {
@@ -520,4 +567,37 @@ model ReturnItem {
   
   @@index([returnId])
   @@index([variantId])
+}
+
+// ─── Expense Tracking ──────────────────────────────────────────────────────────
+
+enum ExpenseCategory {
+  RENT
+  UTILITIES
+  SALARIES
+  SUPPLIES
+  MARKETING
+  MAINTENANCE
+  TRANSPORT
+  FOOD
+  TAX
+  OTHER
+}
+
+model Expense {
+  id         String          @id @default(cuid())
+  amount     Decimal         @db.Decimal(10, 2)
+  category   ExpenseCategory @default(OTHER)
+  date       DateTime        @default(now())
+  notes      String?
+  tenantId   String
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy  String
+  user       User            @relation(fields: [createdBy], references: [id])
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([createdBy])
 }

@@ -5,7 +5,7 @@ import { SalesChart } from '@/components/analytics/SalesChart';
 import { LowStockTable } from '@/components/analytics/LowStockTable';
 import { TopProductsTable } from '@/components/analytics/TopProductsTable';
 import { CategoryPieChart } from '@/components/analytics/CategoryPieChart';
-import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Download, SlidersHorizontal } from 'lucide-react';
+import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Download, SlidersHorizontal, Receipt } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatCurrencyWithSettings } from '@/lib/format';
 import { useTenantSettings } from '@/contexts/SettingsContext';
@@ -20,6 +20,7 @@ interface SummaryData {
     totalOrders: number;
     averageOrderValue: number;
     margin: number;
+    totalExpenses?: number;
 }
 
 interface ProductStat {
@@ -269,14 +270,21 @@ export default function AnalyticsPage() {
                 </Popover>
             </div>
 
-            {/* Metric Cards — 2 cols on mobile, 4 on desktop */}
-            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            {/* Metric Cards — 2 cols on mobile, 3 on md, 5 on xl */}
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
                 <MetricCard
                     className="gap-0 py-3 lg:py-6"
                     title="Revenue"
                     value={formatCurrencyWithSettings(summary?.totalRevenue || 0, settings)}
                     icon={DollarSign}
                     description="Gross revenue"
+                />
+                <MetricCard
+                    className="gap-0 py-3 lg:py-6"
+                    title="Expenses"
+                    value={formatCurrencyWithSettings(summary?.totalExpenses || 0, settings)}
+                    icon={Receipt}
+                    description="Total outgoings"
                 />
                 <MetricCard
                     className="gap-0 py-3 lg:py-6"

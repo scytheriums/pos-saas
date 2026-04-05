@@ -1,3 +1,5 @@
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+
 export default function POSLayout({
     children,
 }: {
@@ -5,7 +7,9 @@ export default function POSLayout({
 }) {
     return (
         <div className="h-screen w-full bg-background overflow-hidden">
-            {children}
+            <ErrorBoundary context="POS">
+                {children}
+            </ErrorBoundary>
         </div>
     );
 }
