@@ -114,7 +114,6 @@ export function PaymentMethodSelector({ open, onClose, total, onConfirm, selecte
                             return (
                                 <div key={index} className="border rounded-lg p-3 space-y-2.5 bg-muted/20">
                                     <div className="flex items-center gap-2">
-                                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                                         <Select value={entry.method} onValueChange={v => updateEntry(index, 'method', v)}>
                                             <SelectTrigger className="flex-1 h-9 text-sm">
                                                 <SelectValue />
