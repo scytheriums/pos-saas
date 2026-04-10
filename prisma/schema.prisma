@@ -230,9 +230,11 @@ model Product {
   description String?
   imageUrl    String? // Main product image
   minStock    Int     @default(10)
-  categoryId  String?
-  supplierId  String?
-  tenantId    String
+  categoryId    String?
+  supplierId    String?
+  tenantId      String
+  isSellable    Boolean @default(true)
+  isPurchasable Boolean @default(true)
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id])
   category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

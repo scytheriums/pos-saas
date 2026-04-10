@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
         const { tenantId } = authResult.user;
 
         const body = await req.json();
-        const { name, description, imageUrl, hasVariants, options, variants, minStock, categoryId } = body;
+        const { name, description, imageUrl, hasVariants, options, variants, minStock, categoryId, isSellable, isPurchasable } = body;
 
         console.log('Creating product payload:', JSON.stringify({
             name,
@@ -50,6 +50,8 @@ export async function POST(req: NextRequest) {
                     imageUrl: imageUrl || null,
                     minStock: minStock || 10,
                     categoryId: categoryId || null,
+                    isSellable: isSellable !== undefined ? isSellable : true,
+                    isPurchasable: isPurchasable !== undefined ? isPurchasable : true,
                     tenantId,
                 },
             });
@@ -316,9 +318,15 @@ export async function GET(req: NextRequest) {
         const cursor = searchParams.get('cursor');
         const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
         const search = searchParams.get('search');
+        const supplierIdFilter = searchParams.get('supplierId');
+        const sellable = searchParams.get('sellable');
+        const purchasable = searchParams.get('purchasable');
 
         const where: Prisma.ProductWhereInput = {
             tenantId,
+            ...(supplierIdFilter ? { supplierId: supplierIdFilter } : {}),
+            ...(sellable === 'true' ? { isSellable: true } : {}),
+            ...(purchasable === 'true' ? { isPurchasable: true } : {}),
             ...(search ? {
                 OR: [
                     { name: { contains: search, mode: 'insensitive' } },
@@ -337,6 +345,8 @@ export async function GET(req: NextRequest) {
                 minStock: true,
                 categoryId: true,
                 tenantId: true,
+                isSellable: true,
+                isPurchasable: true,
                 createdAt: true,
                 options: {
                     select: {

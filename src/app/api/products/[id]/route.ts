@@ -62,7 +62,7 @@ export async function PATCH(
         const { tenantId } = authResult.user;
 
         const body = await req.json();
-        const { name, description, imageUrl, minStock, categoryId } = body;
+        const { name, description, imageUrl, minStock, categoryId, supplierId, isSellable, isPurchasable } = body;
 
         // Verify product belongs to tenant
         const existingProduct = await prisma.product.findFirst({
@@ -80,7 +80,10 @@ export async function PATCH(
                 description,
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined,
                 minStock,
-                categoryId: categoryId !== undefined ? categoryId : undefined
+                categoryId: categoryId !== undefined ? categoryId : undefined,
+                supplierId: supplierId !== undefined ? (supplierId || null) : undefined,
+                isSellable: isSellable !== undefined ? isSellable : undefined,
+                isPurchasable: isPurchasable !== undefined ? isPurchasable : undefined,
             },
             include: {
                 variants: true,

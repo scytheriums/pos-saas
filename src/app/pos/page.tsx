@@ -172,6 +172,7 @@ export default function POSPage() {
                 if (debouncedSearch) params.append('search', debouncedSearch);
                 params.append('page', page.toString());
                 params.append('limit', '20');
+                params.append('sellable', 'true');
 
                 const res = await fetch(`/api/products?${params.toString()}`);
                 if (res.ok) {

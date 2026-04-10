@@ -74,6 +74,8 @@ export default function EditProductPage() {
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [minStock, setMinStock] = useState(10);
     const [categoryId, setCategoryId] = useState<string>('');
+    const [isSellable, setIsSellable] = useState(true);
+    const [isPurchasable, setIsPurchasable] = useState(true);
 
     // Variant state (mirrors VariantMatrixEditor format)
     const [options, setOptions] = useState<OptionState[]>([]);
@@ -96,6 +98,8 @@ export default function EditProductPage() {
             setImageUrl(data.imageUrl || null);
             setMinStock(data.minStock);
             setCategoryId(data.categoryId || '__none__');
+            setIsSellable(data.isSellable ?? true);
+            setIsPurchasable(data.isPurchasable ?? true);
 
             // Map API options to VariantMatrixEditor format
             setOptions((data.options ?? []).map((opt: any) => ({
@@ -136,7 +140,9 @@ export default function EditProductPage() {
                     description,
                     imageUrl,
                     minStock,
-                    categoryId: categoryId === '__none__' ? null : categoryId
+                    categoryId: categoryId === '__none__' ? null : categoryId,
+                    isSellable,
+                    isPurchasable
                 })
             });
 
@@ -281,6 +287,10 @@ export default function EditProductPage() {
                             onImageChange={setImageUrl}
                             onMinStockChange={setMinStock}
                             onCategoryChange={setCategoryId}
+                            isSellable={isSellable}
+                            isPurchasable={isPurchasable}
+                            onIsSellableChange={setIsSellable}
+                            onIsPurchasableChange={setIsPurchasable}
                         />
 
                         {/* Variants */}

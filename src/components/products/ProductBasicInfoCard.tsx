@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { ImageUpload } from '@/components/ui/image-upload';
 
 interface ProductBasicInfoCardProps {
@@ -14,12 +15,16 @@ interface ProductBasicInfoCardProps {
     imageUrl: string | null;
     minStock: number;
     categoryId: string;
+    isSellable?: boolean;
+    isPurchasable?: boolean;
     disabled?: boolean;
     onNameChange: (value: string) => void;
     onDescriptionChange: (value: string) => void;
     onImageChange: (url: string | null) => void;
     onMinStockChange: (value: number) => void;
     onCategoryChange: (value: string) => void;
+    onIsSellableChange?: (value: boolean) => void;
+    onIsPurchasableChange?: (value: boolean) => void;
 }
 
 export function ProductBasicInfoCard({
@@ -28,12 +33,16 @@ export function ProductBasicInfoCard({
     imageUrl,
     minStock,
     categoryId,
+    isSellable = true,
+    isPurchasable = true,
     disabled,
     onNameChange,
     onDescriptionChange,
     onImageChange,
     onMinStockChange,
     onCategoryChange,
+    onIsSellableChange,
+    onIsPurchasableChange,
 }: ProductBasicInfoCardProps) {
     const [categories, setCategories] = useState<any[]>([]);
 
@@ -124,6 +133,30 @@ export function ProductBasicInfoCard({
                     <p className="text-xs text-muted-foreground">
                         You&apos;ll be alerted when stock falls below this level
                     </p>
+                </div>
+                <div className="border-t pt-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <div>
+                            <Label className="text-sm">Sellable (POS)</Label>
+                            <p className="text-xs text-muted-foreground">Show this product on the Point of Sale</p>
+                        </div>
+                        <Switch
+                            checked={isSellable}
+                            onCheckedChange={onIsSellableChange}
+                            disabled={disabled || !onIsSellableChange}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                        <div>
+                            <Label className="text-sm">Purchasable (PO / Supplier)</Label>
+                            <p className="text-xs text-muted-foreground">Allow this product in purchase orders and supplier assignment</p>
+                        </div>
+                        <Switch
+                            checked={isPurchasable}
+                            onCheckedChange={onIsPurchasableChange}
+                            disabled={disabled || !onIsPurchasableChange}
+                        />
+                    </div>
                 </div>
             </CardContent>
         </Card>

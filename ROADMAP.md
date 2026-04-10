@@ -1,323 +1,395 @@
-# Awan POS — Development Roadmap & Todo List
+﻿# Awan POS â€” Development Roadmap & Todo List
 
-> Last updated: April 5, 2026 — Phase 0 complete
+> Last updated: April 11, 2026
 > Check off each item as it is completed.
 
 ---
 
-## Phase 0 — Security & Stability Hardening
-> Priority: **CRITICAL** — Complete before onboarding any real users.
+## Phase 0 â€” Security & Stability Hardening âœ…
+> All automated tasks complete. Credential rotation is a manual ops step.
 
-### 0.1 Disable / Remove Debug Routes in Production ✅
-- [x] Add `NODE_ENV` guard to `/api/debug/tenant`
-- [x] Add `NODE_ENV` guard to `/api/debug/session`
-- [x] Add `NODE_ENV` guard to `/api/debug/auth`
-- [x] Add `NODE_ENV` guard to `/api/debug/seed`
-- [x] Add `NODE_ENV` guard to `/api/debug/clear-session` *(was already guarded)*
+### 0.1 Disable / Remove Debug Routes in Production âœ…
+- [x] Add `NODE_ENV` guard to all `/api/debug/*` routes
 - [x] Verify all debug routes return `404` in production build
 
-### 0.2 Rotate Leaked Credentials
-- [ ] Rotate `DATABASE_URL` (Neon dashboard → regenerate password)
+### 0.2 Rotate Leaked Credentials âš ï¸ Manual
+- [ ] Rotate `DATABASE_URL` (Neon dashboard â†’ regenerate password)
 - [ ] Rotate `BETTER_AUTH_SECRET` (generate new 32-byte secret)
-- [ ] Rotate `NEXT_PUBLIC_STACK_PROJECT_ID` / `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY` / `STACK_SECRET_SERVER_KEY`
-- [x] Confirm `.env.local` is listed in `.gitignore` *(`.env*` pattern already present)*
-- [ ] Audit git history for any committed `.env` files and purge if found
+- [ ] Rotate Stack Auth keys (`NEXT_PUBLIC_STACK_PROJECT_ID`, publishable + secret)
+- [x] Confirm `.env.local` is in `.gitignore`
+- [ ] Audit git history for committed `.env` files and purge if found
 
-### 0.3 Audit Every API Route for Auth Checks ✅
-- [x] `/api/products` — verify session check
-- [x] `/api/categories` — verify session check
-- [x] `/api/customers` — verify session check
-- [x] `/api/orders` — verify session check
-- [x] `/api/discounts` — verify session check
-- [x] `/api/returns` — verify session check
-- [x] `/api/users` — verify session check
-- [x] `/api/roles` — verify session check
-- [x] `/api/inventory/adjustments` — verify session check
-- [x] `/api/analytics/summary` — verify session check
-- [x] `/api/audit-logs` — verify session check
-- [x] `/api/upload` — verify session check *(fixed broken `if (!user)` pattern → proper `if ('error' in authResult)`)*
-- [x] `/api/onboarding` — verify session check
-- [x] `/api/tenant/me` — verify session check
+### 0.3 Audit Every API Route for Auth Checks âœ…
+- [x] All routes (`/api/products`, `/api/orders`, `/api/customers`, `/api/categories`, `/api/discounts`, `/api/returns`, `/api/users`, `/api/roles`, `/api/inventory/adjustments`, `/api/analytics/summary`, `/api/audit-logs`, `/api/upload`, `/api/onboarding`, `/api/tenant/me`) verified
 - [x] All routes return `401` JSON (not redirect) when unauthenticated
 
-### 0.4 Add Rate Limiting ✅
-- [x] Install rate limiting package *(custom in-memory sliding-window — Edge-compatible, no external dependency)*
-- [x] Apply rate limit to `/api/auth/sign-in` (10 req / 15 min per IP)
-- [x] Apply rate limit to `/api/auth/sign-up` (5 req / hour per IP)
-- [x] Apply rate limit to `/api/orders` POST (60 req / min per IP)
-- [x] Return `429 Too Many Requests` with `Retry-After` header
+### 0.4 Add Rate Limiting âœ…
+- [x] Custom in-memory sliding-window rate limiter (Edge-compatible)
+- [x] `/api/auth/sign-in` â€” 10 req / 15 min per IP
+- [x] `/api/auth/sign-up` â€” 5 req / hour per IP
+- [x] `/api/orders` POST â€” 60 req / min per IP
+- [x] Return `429` with `Retry-After` header
 
-### 0.5 Add React Error Boundaries ✅
-- [x] Create a reusable `<ErrorBoundary>` component (`src/components/ui/ErrorBoundary.tsx`)
-- [x] Wrap the entire `/pos` page in an Error Boundary
-- [x] Wrap each dashboard section (products, orders, analytics, etc.) in Error Boundaries
-- [x] Display a user-friendly fallback UI with "Try again" button
+### 0.5 Add React Error Boundaries âœ…
+- [x] Reusable `<ErrorBoundary>` component
+- [x] Wrapped `/pos` page and all dashboard sections
 
-### 0.6 Pagination Consistency Audit ✅
-- [x] `/api/products` — switched to cursor-based pagination
-- [x] `/api/orders` — switched to cursor-based pagination *(also fixed filter bug where where-clause was ignored)*
-- [x] `/api/customers` — switched to cursor-based pagination
-- [x] `/api/audit-logs` — switched to cursor-based pagination
-- [x] `/api/returns` — switched to cursor-based pagination
-- [x] Update frontend list components to use `cursor`/`nextCursor` instead of `page`/`offset` *(orders, customers, returns, audit-logs, products — all updated)*
+### 0.6 Pagination Consistency Audit âœ…
+- [x] All list APIs (`/api/products`, `/api/orders`, `/api/customers`, `/api/audit-logs`, `/api/returns`) switched to cursor-based pagination
+- [x] All frontend list components updated to use `cursor`/`nextCursor`
 
 ---
 
-## Phase 1 — Core POS Completeness
-> Target: ~3–4 weeks after Phase 0
+## Phase 1 â€” Core POS Completeness
+> Completed sections marked âœ…. Remaining items below.
 
-### 1.1 Split Payments ✅
-- [x] Add `PaymentEntry` model to Prisma schema (`orderId`, `method`, `amount`)
-- [x] Run and verify database migration
-- [x] Update `POST /api/orders` to accept an array of payment entries
-- [x] Update POS UI — add "Add Payment Method" button to allow multiple entries
-- [x] Calculate and display remaining balance as entries are added
-- [x] Update receipt to list each payment entry separately
-- [x] Update order history UI to show split payment breakdown
+### 1.1 Split Payments âœ…
+- [x] `PaymentEntry` model; migration run
+- [x] `POST /api/orders` accepts payment entries array
+- [x] POS UI: multi-payment entry, remaining balance display
+- [x] Receipt and order history updated
 
-### 1.2 Shift / Cash Drawer Management
-- [x] Add `Shift` model to Prisma schema (`openedAt`, `closedAt`, `openingFloat`, `expectedCash`, `actualCash`, `difference`, `userId`, `tenantId`)
-- [x] Run and verify database migration
-- [x] Create `POST /api/shifts` — open shift with float amount
-- [x] Create `PUT /api/shifts/[id]/close` — close shift with actual cash count
-- [x] Create `GET /api/shifts` — list shifts with summary
-- [x] Add "Open Shift" modal when cashier logs into POS (if no active shift)
-- [x] Add "Close Shift" button in POS with cash count input
-- [x] Build Shift Summary report page in dashboard
-- [x] Wire shift ID into order creation so orders belong to a shift
+### 1.2 Shift / Cash Drawer Management âœ…
+- [x] `Shift` model; migration run
+- [x] `POST /api/shifts`, `PUT /api/shifts/[id]/close`, `GET /api/shifts`
+- [x] Open/close shift modals in POS; Shift Summary report page
+- [x] Orders linked to active shift
 
-### 1.3 Expense Tracking
-- [x] Add `Expense` model to Prisma schema (`amount`, `category`, `date`, `notes`, `tenantId`, `createdBy`)
-- [x] Add `ExpenseCategory` enum or model
-- [x] Run and verify database migration
-- [x] Create `GET/POST /api/expenses` endpoints
-- [x] Create `PUT/DELETE /api/expenses/[id]` endpoints
-- [x] Build expenses list page in dashboard (`/dashboard/expenses`)
-- [x] Add "Add Expense" form/modal
-- [x] Wire expense totals into analytics — subtract from revenue to show true net profit
-- [x] Update analytics summary chart to include expense line
-
-### 1.6 Petty Cash Payout
-- [x] Add `PettyCashPayout` model to Prisma schema (`amount`, `reason`, `shiftId`, `tenantId`, `createdBy`, `createdAt`)
-- [x] Run and verify database migration
-- [x] Create `GET /api/petty-cash` — list payouts for a shift or tenant
-- [x] Create `POST /api/petty-cash` — record a cash payout during an active shift
-- [x] Add "Petty Cash Out" button in POS (visible only when a shift is active)
-- [x] Quick-entry modal: amount + reason field
-- [x] Deduct total payouts from expected cash in shift-close calculation
-- [x] Show petty cash payout list in shift detail / shift close summary
-
-### 1.7 Mobile & Tablet Responsive Polish ✅
-> All UI/UX work has been moved to **[UI_UX_ROADMAP.md](./UI_UX_ROADMAP.md)** for focused tracking.
-> Phase A (all dashboard pages) is complete. Phases B–F cover POS, Order Detail, Settings, Onboarding, and global polish.
-
-**Summary of completed work:**
-- MobileBottomNav: added Shifts, Expenses, Loyalty links
-- Mobile card views for all dashboard list pages (Orders, Shifts, Expenses, Customers, Returns, Adjustments, Promotions, Audit Logs)
-- Compact header pattern (`text-xl font-bold`, `text-xs` subtitle, `space-y-4` outer, no own padding) applied to all pages
-- `SlidersHorizontal` filter popover applied to: Products, Orders, Customers, Returns, Expenses, Audit Logs
-- Icon-only action buttons, removed all `CardHeader`/`CardTitle` from list cards
-
+### 1.3 Expense Tracking âœ…
+- [x] `Expense` model + `ExpenseCategory`; migration run
+- [x] Full CRUD API; expenses list + add form in dashboard
+- [x] Expense totals wired into analytics (net profit)
 
 ### 1.4 Image Optimization Pipeline
 - [ ] Update `/api/upload` to process uploads through `sharp`
-- [ ] Generate thumbnail (100×100px) on upload
-- [ ] Generate medium size (400×400px) on upload
-- [ ] Generate full size (max 1200px width) on upload
-- [ ] Store all 3 sizes and return URLs for each
-- [ ] Update product image display to use the appropriate size per context (thumb in lists, medium in forms, full in detail)
+- [ ] Generate thumbnail (100Ã—100px), medium (400Ã—400px), full (max 1200px) on upload
+- [ ] Store all 3 sizes; return URLs for each
+- [ ] Update product image display to use appropriate size per context
 
 ### 1.5 Audit Log Retention / Cleanup Job
-- [ ] Add `logRetentionDays` field to `Tenant` settings (default: 90)
-- [ ] Run and verify database migration
-- [ ] Create `DELETE /api/audit-logs/cleanup` route that deletes logs older than retention period
-- [ ] Add retention setting to the Settings UI
-- [ ] Set up Vercel Cron job (`vercel.json` cron) to trigger cleanup daily
+- [ ] Add `logRetentionDays` field to `Tenant` settings (default: 90); migration
+- [ ] `DELETE /api/audit-logs/cleanup` â€” deletes logs older than retention period
+- [ ] Add retention setting to Settings UI
+- [ ] Set up Vercel Cron job (`vercel.json`) to trigger cleanup daily
+
+### 1.6 Petty Cash Payout âœ…
+- [x] `PettyCashPayout` model; migration run
+- [x] `GET/POST /api/petty-cash`
+- [x] "Petty Cash Out" button in POS (shift-gated); deducted from shift expected cash
+
+### 1.7 Mobile & Tablet Responsive Polish âœ…
+- [x] Compact header pattern, mobile card views, filter popovers applied across all dashboard pages
+- [x] `MobileBottomNav` updated with all section links
+- [x] Full detail in `UI_UX_ROADMAP.md`
 
 ---
 
-## Phase 2 — Inventory & Supply Chain
-> Target: ~4–5 weeks after Phase 1
+## Phase 2 â€” Inventory & Supply Chain
 
-### 2.0 Stock Management Toggle ✅
-- [x] Add `enableStockManagement Boolean @default(true)` to `Tenant` model
-- [x] Run and verify database migration (`20260410150000_add_enable_stock_management`)
-- [x] Add `enableStockManagement` to tenant settings GET/PATCH API
-- [x] Add `enableStockManagement` to `TenantSettings` context and defaults
-- [x] Add "Inventory" card with toggle in POS Settings UI — describes that disabling skips stock checks/decrements (for service businesses)
-- [x] Gate stock validation and stock decrement in `POST /api/orders` behind `enableStockManagement` flag — when off, variant price/cost snapshots are still captured but stock is never checked or decremented
+### 2.0 Stock Management Toggle âœ…
+- [x] `enableStockManagement` flag on `Tenant`; migration run
+- [x] Tenant settings API + context updated; POS Settings toggle UI added
+- [x] Stock validation and decrement in `POST /api/orders` gated behind flag
 
-### 2.1 Supplier Management ✅
-- [x] Add `Supplier` model to Prisma schema (`name`, `contactName`, `phone`, `email`, `address`, `paymentTerms`, `tenantId`)
-- [x] Run and verify database migration (`20260410160000_add_suppliers_purchase_orders`)
-- [x] Create `GET/POST /api/suppliers` endpoints
-- [x] Create `GET/PUT/DELETE /api/suppliers/[id]` endpoints
-- [x] Build Suppliers list, new, and edit pages in dashboard (`/dashboard/suppliers`)
-- [x] Link suppliers to products (optional `supplierId` on `Product`)
+### 2.1 Supplier Management âœ…
+- [x] `Supplier` model; migration run
+- [x] Full CRUD API + list/new/edit pages in dashboard
+- [x] Optional `supplierId` on `Product`; supplier edit page with assigned products + PO history tabs
 
-### 2.2 Purchase Orders ✅
-- [x] Add `PurchaseOrder` model (`supplierId`, `status`, `expectedDate`, `notes`, `tenantId`)
-- [x] Add `PurchaseOrderItem` model (`purchaseOrderId`, `variantId`, `quantity`, `unitCost`, `receivedQuantity`)
-- [x] Add `PurchaseOrderStatus` enum: `DRAFT`, `SENT`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED`
-- [x] Run and verify database migration (`20260410160000_add_suppliers_purchase_orders`)
-- [x] Create `GET/POST /api/purchase-orders` endpoints
-- [x] Create `GET/PUT/DELETE /api/purchase-orders/[id]` endpoints
-- [x] Create `POST /api/purchase-orders/[id]/receive` — marks as received and auto-increments stock
-- [x] Build Purchase Orders list, new, and detail pages (`/dashboard/purchase-orders`)
-- [x] Build "Receive Stock" UI (confirm quantities received, handle partial receives)
+### 2.2 Purchase Orders (Basic) âœ…
+- [x] `PurchaseOrder` + `PurchaseOrderItem` models; `PurchaseOrderStatus` enum; migration run
+- [x] Full CRUD API + list/new/detail pages in dashboard
+- [x] `POST /api/purchase-orders/[id]/receive` â€” receive stock, auto-increment inventory
+- [x] `isSellable` / `isPurchasable` flags on `Product`; POS and PO searches filtered accordingly
 
 ### 2.3 Barcode Label Printing
-- [ ] Install `bwip-js` and `jspdf` packages
-- [ ] Create a `generateBarcodeLabel()` utility (barcode image + SKU + name + price)
-- [ ] Add "Print Labels" button on the product detail page
-- [ ] Add quantity selector (how many copies to print)
-- [ ] Support printing multiple products' labels in one batch from the products list
-- [ ] Test with common label sizes (30×20mm, 50×30mm)
+- [ ] Install `bwip-js` and `jspdf`
+- [ ] `generateBarcodeLabel()` utility (barcode + SKU + name + price)
+- [ ] "Print Labels" button on product detail page with quantity selector
+- [ ] Batch print from products list
+- [ ] Support 30Ã—20mm and 50Ã—30mm label sizes
 
 ### 2.4 Product Bundling / Combos
 - [ ] Add `ProductBundle` model (`productId`, `tenantId`, `name`)
-- [ ] Add `ProductBundleItem` model (`bundleId`, `variantId`, `quantity`)
-- [ ] Run and verify database migration
-- [ ] Update order creation logic to detect bundles and deduct component stock
-- [ ] Add "Create Bundle" UI in product management
-- [ ] Display bundle components in POS cart so cashier can see what's included
-- [ ] Handle partial stock — prevent bundle sale if any component is out of stock
+- [ ] Add `ProductBundleItem` model (`bundleId`, `variantId`, `quantity`); migration
+- [ ] Update order creation to deduct component stock when a bundle is sold
+- [ ] "Create Bundle" UI in product management
+- [ ] Show bundle components in POS cart
+- [ ] Block sale if any component is out of stock
 
-### 2.5 Database Performance Indexes ✅
-- [x] Add index on `Order.tenantId` in Prisma schema
-- [x] Add index on `Order.createdAt` in Prisma schema
-- [x] Add index on `Order.status` in Prisma schema
-- [x] Add composite index on `Order.(tenantId, createdAt)` in Prisma schema
-- [x] Add composite index on `Order.(tenantId, status)` in Prisma schema
-- [x] Add index on `Order.customerId` in Prisma schema
-- [x] Add index on `ProductVariant.sku` in Prisma schema *(already existed via `@unique`)*
-- [x] Add index on `Product.tenantId` in Prisma schema
-- [x] Add index on `Product.categoryId` in Prisma schema
-- [x] Add index on `OrderItem.orderId` in Prisma schema
-- [x] Add index on `OrderItem.variantId` in Prisma schema
-- [x] Add index on `PaymentEntry.orderId` in Prisma schema
-- [x] Add index on `StockAdjustment.tenantId` in Prisma schema
-- [x] Add composite index on `StockAdjustment.(tenantId, createdAt)` in Prisma schema
-- [x] Add index on `StockAdjustment.productVariantId` in Prisma schema
-- [x] Add index on `AuditLog.tenantId` in Prisma schema *(already covered by composite indexes)*
-- [x] Add index on `AuditLog.createdAt` in Prisma schema *(already covered by composite indexes)*
-- [x] Add composite index on `AuditLog.(tenantId, createdAt)` in Prisma schema *(already existed)*
-- [x] Run and verify migration (`20260410134913_add_performance_indexes`)
-- [x] Enable Neon connection pooling (PgBouncer) in `DATABASE_URL` *(already active — hostname contains `-pooler` suffix)*
-- [x] Run query performance tests and verify improvement *(indexes applied and deployed; ongoing monitoring via Neon console)*
+### 2.5 Database Performance Indexes âœ…
+- [x] Indexes added on `Order`, `Product`, `OrderItem`, `PaymentEntry`, `StockAdjustment`, `AuditLog`; migration run
+- [x] Neon connection pooling (PgBouncer) active
 
 ---
 
-## Phase 3 — Customer & Revenue Growth
-> Target: ~3–4 weeks after Phase 2
+## Phase 3 â€” Unit of Measure (UOM) System
+> **Foundation phase â€” must be complete before Phase 4 (expanded PO) and Phase 6 (BOM).**
+> UOM is module-gated: enabled per tenant in Settings. Off by default for pure retail tenants.
 
-### 3.1 WhatsApp Receipt Delivery
-- [ ] Sign up for Fonnte or WhatsApp Business API account
-- [ ] Add `WHATSAPP_API_KEY` to `.env.local`
-- [ ] Create a `sendWhatsAppReceipt()` utility function
-- [ ] Add `whatsappOptIn` boolean field to `Customer` model
+### 3.1 UOM Data Model
+- [ ] Add `UnitOfMeasure` model: `id`, `tenantId` (null = system default), `name`, `symbol`, `category` (`WEIGHT` | `VOLUME` | `COUNT` | `LENGTH` | `CUSTOM`), `isBase Boolean`
+- [ ] Add `UomConversion` model: `fromUomId`, `toUomId`, `factor` (multiply from â†’ to), `tenantId` (null = system-wide)
+- [ ] Seed system-default UOMs: g, kg, ml, L, pcs, box, pack, dozen, cm, m
+- [ ] Seed system-wide conversions: gâ†”kg (Ã·1000), mlâ†”L (Ã·1000), pcsâ†”dozen (Ã·12), pcsâ†”pack (configurable)
 - [ ] Run and verify database migration
-- [ ] Add "Send to WhatsApp" toggle on receipt screen in POS
-- [ ] Add WhatsApp opt-in toggle in customer profile UI
-- [ ] Build receipt message template (itemized list, total, store name)
+
+### 3.2 UOM on Products & Variants
+- [ ] Add `baseUomId` to `Product` â€” the internal storage unit (e.g. g for flour)
+- [ ] Add `purchaseUomId` to `Product` â€” unit used on POs (e.g. kg); defaults to `baseUomId`
+- [ ] Add `salesUomId` to `Product` â€” unit shown in POS/cart (e.g. pcs); defaults to `baseUomId`
+- [ ] Add `purchaseUomQty` to `Product` â€” how many base units per purchase unit (e.g. 1 kg = 1000 g)
+- [ ] Run and verify database migration
+- [ ] Update product create / edit UI â€” UOM selector for base, purchase, and sales UOM
+- [ ] Show unit symbol next to stock quantity everywhere (inventory, PO receive, adjustments)
+
+### 3.3 UOM Conversion Engine
+- [ ] Create `src/lib/uom.ts` â€” `convert(qty, fromUomId, toUomId, tenantId)` using `UomConversion` table; throw if no path found
+- [ ] Add `getConversionFactor(fromUomId, toUomId, tenantId)` with fallback chain (tenant â†’ system)
+- [ ] Unit-test conversion logic (direct, inverse, chained)
+- [ ] Apply conversion in PO receive: received qty in `purchaseUomId` â†’ stored in `baseUomId`
+- [ ] Apply conversion in POS sale: stock decremented in `baseUomId`; cart shows `salesUomId`
+
+### 3.4 UOM Management UI
+- [ ] UOM list page in Settings (`/dashboard/settings/uom`) â€” shows system defaults (read-only) + tenant custom UOMs
+- [ ] Add / edit / delete custom UOMs (tenant-scoped)
+- [ ] Conversion table UI â€” add conversion rules between UOMs (e.g. 1 box = 24 pcs)
+- [ ] Inline validation: warn if a circular or duplicate conversion is entered
+- [ ] "Enable UOM module" toggle in tenant Settings (defaults off for retail, on for FnB/mixed)
+
+---
+
+## Phase 4 â€” Business Type & Module Configuration
+> **Runs right after tenant onboarding.** Determines which dashboard sections and features are visible.
+
+### 4.1 Business Type Model
+- [ ] Add `businessType` enum to `Tenant`: `RETAIL` | `FNB` | `SERVICE` | `MIXED`
+- [ ] Run and verify database migration
+- [ ] Add business type selection step to onboarding wizard (step after store name/logo, before first product)
+- [ ] Extend tenant settings GET/PATCH API to expose `businessType`
+
+### 4.2 Module Registry
+- [ ] Add `TenantModules` model (or JSON column on `Tenant`): `enableUom`, `enableBom`, `enablePurchaseApproval`, `enableLandedCosts`, `enableSupplierInvoicing`, `enableApLedger`, `enableLoyalty`, `enableWhatsapp`, `enableBundles`
+- [ ] Run and verify database migration
+- [ ] Create `GET/PATCH /api/tenant/modules` endpoint (owner/admin only)
+- [ ] Apply business-type presets on onboarding completion:
+  - `RETAIL` â†’ enableBundles, enableBom off; UOM off
+  - `FNB` â†’ enableUom, enableBom, enableLandedCosts on; enableBundles off
+  - `SERVICE` â†’ stock management off; all inventory modules off
+  - `MIXED` â†’ all modules on, user configures manually
+- [ ] Build Module Settings page (`/dashboard/settings/modules`) â€” toggle each module on/off post-onboarding with short description of what each does
+- [ ] Dashboard sidebar links adapt to active modules (hide sections for disabled modules)
+- [ ] API routes for gated modules return `403` with `{ error: 'Module not enabled' }` if accessed while disabled
+
+---
+
+## Phase 5 â€” Comprehensive Purchase Order Module
+> Upgrades the basic PO (Phase 2.2) into a full procurement cycle.
+> Requires Phase 3 (UOM) to be complete for landed cost distribution and UOM-aware receiving.
+
+### 5.1 PO Workflow & Approval
+- [ ] Extend `PurchaseOrderStatus` enum: add `PENDING_APPROVAL` between DRAFT and SENT
+- [ ] Add `approvalThreshold` (Decimal) to `TenantModules` â€” POs above this amount require approval; `0` = always require, `null` = never require
+- [ ] Add `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason` to `PurchaseOrder`
+- [ ] Run and verify database migration
+- [ ] `POST /api/purchase-orders/[id]/submit` â€” move DRAFT â†’ PENDING_APPROVAL (or APPROVED if below threshold)
+- [ ] `POST /api/purchase-orders/[id]/approve` â€” manager/owner only; move â†’ APPROVED
+- [ ] `POST /api/purchase-orders/[id]/reject` â€” manager/owner only; move â†’ DRAFT with rejection reason
+- [ ] PO detail page: show approval status, approver name, rejection reason
+- [ ] Dashboard: "Pending Approvals" badge on PO nav link when items await action
+
+### 5.2 PO Amendments (Change Orders)
+- [ ] Add `PurchaseOrderRevision` model: `purchaseOrderId`, `revisionNumber`, `changedBy`, `changedAt`, `snapshotJson`
+- [ ] Run and verify database migration
+- [ ] On any edit to an APPROVED or SENT PO, auto-increment `revisionNumber` and snapshot previous state
+- [ ] Revision history tab on PO detail page â€” shows diff of each change
+
+### 5.3 Supplier Price Lists & Quotations
+- [ ] Add `SupplierPriceList` model: `supplierId`, `variantId`, `uomId`, `unitPrice`, `validFrom`, `validTo`, `tenantId`
+- [ ] Run and verify database migration
+- [ ] `GET/POST /api/suppliers/[id]/price-list` endpoints
+- [ ] Price list tab on supplier edit page â€” add/edit/remove quoted prices per SKU
+- [ ] On PO item add: auto-fill unit cost from active supplier price list if available (highlight when applied)
+
+### 5.4 Goods Receipt Note (GRN) & Lot Tracking
+- [ ] Add `GoodsReceiptNote` model: `purchaseOrderId`, `receivedBy`, `receivedAt`, `notes`, `tenantId`
+- [ ] Add `GrnItem` model: `grnId`, `poItemId`, `receivedQty`, `uomId`, `lotNumber` (optional), `expiryDate` (optional)
+- [ ] Run and verify database migration
+- [ ] Convert existing "Receive Stock" flow into a proper GRN creation flow
+- [ ] GRN list on PO detail page; each GRN is a permanent document
+- [ ] Optional lot/batch number input on receipt (enabled per product in product settings)
+- [ ] Optional expiry date input (enabled per product)
+
+### 5.5 Landed Costs
+> Requires `enableLandedCosts` module flag to be on.
+- [ ] Add `LandedCost` model: `purchaseOrderId`, `type` (`FREIGHT` | `DUTY` | `HANDLING` | `OTHER`), `amount`, `allocationMethod` (`BY_VALUE` | `BY_QTY` | `BY_WEIGHT`)
+- [ ] Run and verify database migration
+- [ ] Landed costs section on PO detail page (add/edit after GRN is created)
+- [ ] `POST /api/purchase-orders/[id]/landed-costs/allocate` â€” distributes total landed cost across received items by chosen method; updates each item's effective unit cost
+- [ ] Updated unit cost flows through to product cost (same as existing `updateVariantCost` logic)
+
+### 5.6 PO Templates
+- [ ] Add `PurchaseOrderTemplate` model: `supplierId`, `name`, `notes`, `tenantId` + items array
+- [ ] Run and verify database migration
+- [ ] "Save as Template" button on PO detail page
+- [ ] "New from Template" selector on PO create page â€” pre-fills supplier + items
+
+---
+
+## Phase 6 â€” Supplier Invoicing & Accounts Payable
+> Closes the procurement loop: PO â†’ GRN â†’ Invoice â†’ Payment.
+> Two modes, configurable per tenant in Module Settings:
+> - **Simple** (`enableApLedger = false`): payment tracking only â€” log amounts paid, show balance
+> - **Full AP Ledger** (`enableApLedger = true`): journal entries (debit AP, credit cash/bank); AP aging available
+
+### 6.1 Supplier Invoice
+- [ ] Add `SupplierInvoice` model: `tenantId`, `supplierId`, `purchaseOrderId` (nullable â€” can be standalone), `invoiceNumber`, `invoiceDate`, `dueDate`, `subtotal`, `taxAmount`, `totalAmount`, `status` (`DRAFT` | `PENDING` | `PARTIAL` | `PAID` | `OVERDUE`)
+- [ ] Add `SupplierInvoiceItem` model: `invoiceId`, `poItemId` (nullable), `description`, `qty`, `uomId`, `unitPrice`, `lineTotal`
+- [ ] Run and verify database migration
+- [ ] `GET/POST /api/supplier-invoices` endpoints
+- [ ] `GET/PATCH/DELETE /api/supplier-invoices/[id]` endpoints
+- [ ] Auto-generate invoice from received PO (pre-filled from GRN quantities and PO unit costs)
+- [ ] Invoice list page (`/dashboard/supplier-invoices`) with status filter
+- [ ] PO detail page: "Linked Invoice" section showing invoice number, total, status
+
+### 6.2 Supplier Payments
+- [ ] Add `SupplierPayment` model: `invoiceId`, `tenantId`, `amount`, `paymentDate`, `method` (`CASH` | `BANK_TRANSFER` | `CHEQUE` | `OTHER`), `reference`, `notes`
+- [ ] Run and verify database migration
+- [ ] `POST /api/supplier-invoices/[id]/payments` â€” record a payment (partial or full)
+- [ ] `GET /api/supplier-invoices/[id]/payments` â€” list payments for an invoice
+- [ ] Outstanding balance auto-calculated (`totalAmount` âˆ’ sum of payments)
+- [ ] Invoice status auto-transitions: PENDING â†’ PARTIAL â†’ PAID based on payment total
+- [ ] Payment history on invoice detail page
+
+### 6.3 AP Aging Report
+> Available in both Simple and Full AP Ledger modes.
+- [ ] `GET /api/reports/ap-aging` â€” returns outstanding invoices bucketed: current, 1â€“30, 31â€“60, 61â€“90, 90+ days
+- [ ] AP Aging report page (`/dashboard/reports/ap-aging`) with supplier breakdown table
+- [ ] Overdue alert: badge on sidebar when any invoice is past due date
+
+### 6.4 Full AP Ledger (optional â€” `enableApLedger` flag)
+- [ ] Add `JournalEntry` model: `tenantId`, `date`, `description`, `reference`
+- [ ] Add `JournalLine` model: `entryId`, `accountCode`, `accountName`, `debit`, `credit`
+- [ ] Run and verify database migration
+- [ ] On invoice creation: debit Inventory/Expense, credit Accounts Payable
+- [ ] On payment record: debit Accounts Payable, credit Cash/Bank
+- [ ] Journal entries tab on invoice detail page
+- [ ] Basic chart of accounts management page (`/dashboard/settings/chart-of-accounts`)
+
+---
+
+## Phase 7 â€” Bill of Materials (F&B / Recipe Mode)
+> Gated behind `enableBom` module flag. Designed for FnB tenants; recipes + costing focus.
+> Requires Phase 3 (UOM) â€” all BOM quantities are UOM-aware.
+
+### 7.1 BOM Core
+- [ ] Add `BillOfMaterial` model: `tenantId`, `productId` (finished item), `name`, `yieldQty`, `yieldUomId`, `notes`
+- [ ] Add `BomLine` model: `bomId`, `ingredientVariantId`, `qty`, `uomId` â€” stored in ingredient's base UOM via conversion
+- [ ] Run and verify database migration
+- [ ] BOM create/edit page per product (`/dashboard/products/[id]/bom`)
+- [ ] BOM costing engine: sum ingredient `(qty in base UOM Ã— current cost)` Ã· yield â†’ cost per unit of finished item
+- [ ] BOM cost card panel: shows ingredient cost breakdown, yield cost, suggested price, gross margin %
+- [ ] Link BOM to product: product detail page shows "Recipe" tab if BOM exists
+
+### 7.2 Recipe Scaling & Substitutions
+- [ ] Recipe scaling input on BOM page (enter batch multiplier â†’ all quantities scale live)
+- [ ] Add `BomSubstitute` model: `bomLineId`, `substituteVariantId`, `conversionFactor` â€” defines equivalent substitute ingredient
+- [ ] Substitution UI on BOM line: mark a substitute ingredient, set equivalence ratio
+- [ ] During production / stock check: if primary ingredient is low, suggest substitute
+
+### 7.3 Menu Costing & Profitability
+- [ ] Menu cost report page (`/dashboard/reports/menu-costing`) â€” table of all products with active BOM
+- [ ] Columns: Item, BOM cost, Selling price, Cost%, Gross margin, recommendation flag (if cost% > threshold)
+- [ ] Cost% threshold configurable in tenant Settings (e.g. warn if > 35%)
+- [ ] "Recalculate All" button â€” refreshes BOM costs from current ingredient prices
+- [ ] BOM cost history: track how cost changes over time as ingredient purchase prices change
+
+### 7.4 Stock Consumption via BOM
+- [ ] On POS sale of a product with an active BOM: deduct ingredient stock (in base UOM) instead of finished-good stock
+- [ ] Gate behind `enableBom` flag â€” if flag is off, standard variant stock deduction applies
+- [ ] Handle partial stock: warn cashier if an ingredient is insufficient to fulfill the item qty in cart
+- [ ] BOM ingredient stock check shown as part of POS low-stock warning system
+
+---
+
+## Phase 8 â€” Customer & Revenue Growth
+
+### 8.1 WhatsApp Receipt Delivery
+- [ ] Sign up for Fonnte or WhatsApp Business API
+- [ ] Add `WHATSAPP_API_KEY` to `.env.local`
+- [ ] `sendWhatsAppReceipt()` utility function
+- [ ] Add `whatsappOptIn` boolean to `Customer` model; migration
+- [ ] "Send to WhatsApp" toggle on POS receipt screen
+- [ ] Receipt message template: itemized list, total, store name, points earned
 - [ ] Test end-to-end delivery
 
-### 3.2 Loyalty Program Enhancement
-- [x] Add `pointsPerCurrency` (earn rate) field to `Tenant` settings (e.g., 1 point per Rp1,000)
-- [x] Add `pointRedemptionRate` field to `Tenant` settings (e.g., 100 points = Rp1,000 discount)
-- [x] Add `minimumRedeemPoints` field to `Tenant` settings
-- [x] Run and verify database migration
-- [x] Update order creation to auto-award points based on earn rate
-- [x] Add "Redeem Points" input in POS checkout — deducts from order total
-- [x] Add loyalty config section in Settings UI
-- [x] Display customer's point balance in POS when customer is selected
-- [x] Show points earned on receipt
+### 8.2 Loyalty Program Enhancement âœ…
+- [x] `pointsPerCurrency`, `pointRedemptionRate`, `minimumRedeemPoints` on Tenant settings; migration run
+- [x] Auto-award points on order; redeem points in POS checkout; points shown on receipt
+- [x] Loyalty config section in Settings UI
 
-### 3.3 Offline Sync Conflict Resolution ✅
-- [x] Add `lastModifiedAt` timestamp to `Order` and `OrderItem` models
-- [x] Add `offlineClientId` field to `Order` for idempotent deduplication
-- [x] Run and verify database migration (`20260410135742_add_last_modified_at`, `20260410140000_add_offline_client_id`)
-- [x] Implement server-wins conflict resolution in sync logic — POST `/api/orders` checks `offlineClientId`; if order already exists, returns server version (idempotent, no duplicate created)
-- [x] Upgrade Dexie schema (version 3) — add `syncQueue` table with `offlineOrderId`, `attempts`, `nextRetryAt`, `status`, `lastError`
-- [x] Add `src/lib/sync.ts` — `enqueueSyncOrder()`, `processSyncQueue()` with exponential backoff (base 2s, cap 60s, max 5 attempts), `retryAllFailed()`
-- [x] Add a sync status indicator badge in POS UI (✓ Synced / ⟳ Syncing / ✕ Offline / ⚠ Error) via `OfflineIndicator` + Dexie `useLiveQuery`
-- [x] Auto-sync triggered on `window.online` event
-- [x] Add a "Force Sync" button in POS Settings for manual trigger
+### 8.3 Offline Sync Conflict Resolution âœ…
+- [x] `lastModifiedAt` + `offlineClientId` on `Order`; migrations run
+- [x] Server-wins idempotent sync via `offlineClientId` check
+- [x] Dexie v3 `syncQueue` with exponential backoff (`src/lib/sync.ts`)
+- [x] Sync status badge in POS UI; auto-sync on `window.online`; Force Sync button
 
-### 3.4 Subscription Billing (SaaS Monetization)
-- [ ] Define subscription plans and feature limits (Free, Basic, Pro tiers)
+### 8.4 Subscription Billing (SaaS Monetization)
+- [ ] Define plan tiers (Free / Basic / Pro) and per-plan feature limits
 - [ ] Add `Subscription` model (`tenantId`, `plan`, `status`, `currentPeriodStart`, `currentPeriodEnd`)
-- [ ] Add `Invoice` model (`tenantId`, `amount`, `status`, `paidAt`)
-- [ ] Run and verify database migration
+- [ ] Add `Invoice` model (`tenantId`, `amount`, `status`, `paidAt`); migration
 - [ ] Integrate Xendit or Midtrans payment gateway
-- [ ] Add `POST /api/billing/subscribe` endpoint
-- [ ] Add `POST /api/billing/webhook` endpoint for payment callbacks
-- [ ] Create billing/subscription page in dashboard (`/dashboard/billing`)
-- [ ] Implement feature flags based on active plan (enforce limits per plan)
-- [ ] Add upgrade prompts when tenant hits plan limits
+- [ ] `POST /api/billing/subscribe` and `POST /api/billing/webhook` endpoints
+- [ ] Billing/subscription page (`/dashboard/billing`)
+- [ ] Feature flags enforced per plan; upgrade prompts when limits are hit
 
 ---
 
-## Phase 4 — Multi-Outlet & Desktop Polish
-> Target: ~5–6 weeks after Phase 3
+## Phase 9 â€” Multi-Outlet & Desktop Polish
 
-### 4.1 Multi-Location / Outlet Support
-- [ ] Add `Location` model to Prisma schema (`name`, `address`, `phone`, `tenantId`, `isDefault`)
-- [ ] Add `locationId` foreign key to `ProductVariant` (stock per location)
-- [ ] Add `locationId` to `Order` model
-- [ ] Add `locationId` to `Shift` model
-- [ ] Run and verify database migration
-- [ ] Create `GET/POST /api/locations` endpoints
-- [ ] Create `PUT/DELETE /api/locations/[id]` endpoints
-- [ ] Add location selector to POS login/startup flow
-- [ ] Update inventory queries to filter by location
-- [ ] Update analytics to support per-location and cross-location views
-- [ ] Build Locations management page in dashboard (`/dashboard/locations`)
+### 9.1 Multi-Location / Outlet Support
+- [ ] Add `Location` model (`name`, `address`, `phone`, `tenantId`, `isDefault`); migration
+- [ ] `locationId` on `ProductVariant` (stock per location), `Order`, `Shift`
+- [ ] `GET/POST /api/locations` and `PUT/DELETE /api/locations/[id]`
+- [ ] Location selector in POS startup flow
+- [ ] Inventory and analytics filtered by location; cross-location views
+- [ ] Locations management page (`/dashboard/locations`)
 
-### 4.2 Stock Transfer Between Outlets
-- [ ] Add `StockTransfer` model (`fromLocationId`, `toLocationId`, `status`, `tenantId`, `requestedBy`)
-- [ ] Add `StockTransferItem` model (`transferId`, `variantId`, `quantity`)
-- [ ] Add `StockTransferStatus` enum: `PENDING`, `APPROVED`, `IN_TRANSIT`, `RECEIVED`, `CANCELLED`
-- [ ] Run and verify database migration
-- [ ] Create `POST /api/stock-transfers` — request a transfer
-- [ ] Create `PUT /api/stock-transfers/[id]/approve` — approve and deduct source stock
-- [ ] Create `PUT /api/stock-transfers/[id]/receive` — confirm receipt and add to destination stock
-- [ ] Build Stock Transfer UI in dashboard (`/dashboard/stock-transfers`)
-- [ ] Add notifications/alerts for pending transfer approvals
+### 9.2 Stock Transfer Between Outlets
+- [ ] Add `StockTransfer` + `StockTransferItem` models; `StockTransferStatus` enum (`PENDING` | `APPROVED` | `IN_TRANSIT` | `RECEIVED` | `CANCELLED`); migration
+- [ ] `POST /api/stock-transfers`, `PUT .../approve`, `PUT .../receive`
+- [ ] Stock Transfer UI (`/dashboard/stock-transfers`)
+- [ ] Notifications/alerts for pending transfer approvals
 
-### 4.3 Customer Display (2nd Screen — Electron)
-- [ ] Detect if running in Electron environment
-- [ ] Create a `customer-display.html` / Next.js route for the secondary display content
-- [ ] Update `electron/main.js` to open a second `BrowserWindow` on the secondary display
-- [ ] Implement IPC channel between main POS window and customer display window
-- [ ] Show live cart items, subtotal, and total on customer display
-- [ ] Show payment method and change amount when transaction completes
-- [ ] Show idle/welcome screen when no active transaction
-- [ ] Add customer display enable/disable toggle in POS settings
+### 9.3 Customer Display (2nd Screen â€” Electron)
+- [ ] Detect Electron environment; open second `BrowserWindow` on secondary display
+- [ ] IPC channel between main POS window and customer display
+- [ ] Customer display shows: live cart, subtotal/total, payment/change on completion, idle screen
+- [ ] Enable/disable toggle in POS settings
 
-### 4.4 Electron Auto-Updater
-- [ ] Install `electron-updater` package
-- [ ] Set up GitHub Releases (or S3 bucket) as update feed
-- [ ] Configure `electron-builder` to publish update metadata (`latest.yml`)
-- [ ] Add auto-update check on app startup in `electron/main.js`
-- [ ] Show in-app notification when an update is available
-- [ ] Add "Download & Install Update" action in the notification
-- [ ] Test update flow end-to-end (old version → new version)
-- [ ] Add current app version display in Settings page
+### 9.4 Electron Auto-Updater
+- [ ] Install `electron-updater`; configure `electron-builder` with GitHub Releases feed
+- [ ] Auto-update check on app startup; in-app notification + "Install Update" action
+- [ ] Test end-to-end update flow; current version shown in Settings
 
 ---
 
 ## Progress Summary
 
-| Phase | Total Tasks | Completed | Status |
+| Phase | Description | Key Remaining | Status |
 |---|---|---|---|
-| Phase 0 — Security | 24 | 24 | ✅ **Complete** (0.2 credential rotation is a manual step) |
-| Phase 1 — Core POS | 60 | 51 | 🔄 **In Progress** (1.1, 1.2, 1.3, 1.6, 1.7 complete) |
-| Phase 2 — Inventory | 33 | 0 | Not Started |
-| Phase 3 — Growth | 27 | 9 | 🔄 **In Progress** (3.2 complete) |
-| Phase 4 — Multi-Outlet | 28 | 0 | Not Started |
-| **Total** | **172** | **76** | — |
+| Phase 0 | Security & Stability | 0.2 credential rotation (manual) | âœ… Complete |
+| Phase 1 | Core POS | 1.4 Image pipeline, 1.5 Audit retention | ðŸ”„ In Progress |
+| Phase 2 | Inventory & Supply Chain | 2.3 Barcode, 2.4 Bundles | ðŸ”„ In Progress |
+| Phase 3 | UOM System | All tasks | â¬œ Not Started |
+| Phase 4 | Business Type & Modules | All tasks | â¬œ Not Started |
+| Phase 5 | Comprehensive PO | All tasks | â¬œ Not Started |
+| Phase 6 | Supplier Invoicing & AP | All tasks | â¬œ Not Started |
+| Phase 7 | BOM / Recipes (F&B) | All tasks | â¬œ Not Started |
+| Phase 8 | Customer & Growth | 8.1 WhatsApp, 8.4 Billing | ðŸ”„ In Progress |
+| Phase 9 | Multi-Outlet & Desktop | All tasks | â¬œ Not Started |
 
 ---
 
-> **Tip:** Update the Progress Summary table as phases are completed. Check off each `- [ ]` item by changing it to `- [x]` when done.
+> **Implementation order:** Phase 0/1/2 cleanup â†’ Phase 3 (UOM) â†’ Phase 4 (Modules) â†’ Phase 5 (PO) â†’ Phase 6 (AP) â†’ Phase 7 (BOM) â†’ Phase 8 â†’ Phase 9
+> Phases 5, 6, and 7 are tightly dependent: UOM must exist before PO landed costs and BOM quantities work correctly.

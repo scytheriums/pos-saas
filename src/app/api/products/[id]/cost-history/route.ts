@@ -40,6 +40,34 @@ export async function GET(
             return NextResponse.json({ error: "Product not found" }, { status: 404 });
         }
 
+        const variantIds = product.variants.map(v => v.id);
+
+        // Get PO receipt cost update events for this product's variants
+        const poItems = await prisma.purchaseOrderItem.findMany({
+            where: {
+                variantId: { in: variantIds },
+                updateVariantCost: true,
+                receivedQuantity: { gt: 0 },
+                purchaseOrder: { tenantId },
+            },
+            select: {
+                id: true,
+                unitCost: true,
+                receivedQuantity: true,
+                variant: { select: { sku: true } },
+                purchaseOrder: { select: { id: true, createdAt: true } },
+            },
+            orderBy: { purchaseOrder: { createdAt: 'desc' } },
+        });
+
+        const poUpdates = poItems.map(item => ({
+            date: item.purchaseOrder.createdAt,
+            poId: item.purchaseOrder.id,
+            variantSku: item.variant?.sku ?? null,
+            unitCost: Number(item.unitCost),
+            receivedQuantity: item.receivedQuantity,
+        }));
+
         // Get all order items for this product's variants
         const orderItems = await prisma.orderItem.findMany({
             where: {
@@ -73,41 +101,39 @@ export async function GET(
             }
         });
 
-        // Group by cost to find cost periods
+        // Group by (variantSku, cost) to find per-variant cost periods
         const costPeriods = new Map<string, {
             cost: number;
+            variantSku: string;
             firstSeenDate: Date;
             lastSeenDate: Date;
             orderCount: number;
             totalQuantity: number;
             totalRevenue: number;
-            variantsSeen: Set<string>;
         }>();
 
         for (const item of orderItems) {
-            const costKey = Number(item.cost).toFixed(2);
-            const existing = costPeriods.get(costKey);
+            const mapKey = `${item.variant.sku}::${Number(item.cost).toFixed(2)}`;
+            const existing = costPeriods.get(mapKey);
 
             if (existing) {
                 existing.lastSeenDate = item.order.createdAt;
                 existing.orderCount += 1;
                 existing.totalQuantity += item.quantity;
                 existing.totalRevenue += Number(item.price) * item.quantity;
-                existing.variantsSeen.add(item.variant.sku);
             } else {
-                costPeriods.set(costKey, {
+                costPeriods.set(mapKey, {
                     cost: Number(item.cost),
+                    variantSku: item.variant.sku,
                     firstSeenDate: item.order.createdAt,
                     lastSeenDate: item.order.createdAt,
                     orderCount: 1,
                     totalQuantity: item.quantity,
                     totalRevenue: Number(item.price) * item.quantity,
-                    variantsSeen: new Set([item.variant.sku])
                 });
             }
         }
 
-        // Convert to array and calculate metrics
         const history = Array.from(costPeriods.values()).map(period => {
             const averagePrice = period.totalQuantity > 0 ? period.totalRevenue / period.totalQuantity : 0;
             const totalCost = period.cost * period.totalQuantity;
@@ -116,29 +142,32 @@ export async function GET(
 
             return {
                 cost: period.cost,
+                variantSku: period.variantSku,
                 firstSeenDate: period.firstSeenDate,
                 lastSeenDate: period.lastSeenDate,
                 orderCount: period.orderCount,
                 totalQuantity: period.totalQuantity,
                 averagePrice,
                 margin,
-                variantsCount: period.variantsSeen.size
             };
-        }).sort((a, b) => b.firstSeenDate.getTime() - a.firstSeenDate.getTime());
-
-        // Get current variant data
-        const currentCost = product.variants.length > 0 ? Number(product.variants[0].cost) : 0;
-        const currentPrice = product.variants.length > 0 ? Number(product.variants[0].price) : 0;
-        const currentMargin = currentPrice > 0 ? ((currentPrice - currentCost) / currentPrice) * 100 : 0;
+        }).sort((a, b) => {
+            if (a.variantSku !== b.variantSku) return a.variantSku.localeCompare(b.variantSku);
+            return b.firstSeenDate.getTime() - a.firstSeenDate.getTime();
+        });
 
         return NextResponse.json({
             productId: product.id,
             productName: product.name,
-            currentCost,
-            currentPrice,
-            currentMargin,
             variantsCount: product.variants.length,
-            history
+            variants: product.variants.map(v => ({
+                id: v.id,
+                sku: v.sku,
+                cost: Number(v.cost),
+                price: Number(v.price),
+                margin: Number(v.price) > 0 ? ((Number(v.price) - Number(v.cost)) / Number(v.price)) * 100 : 0,
+            })),
+            history,
+            poUpdates,
         });
 
     } catch (error) {

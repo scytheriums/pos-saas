@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, Plus, Search, Trash2, Package, Pencil } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Search, Trash2, Package } from 'lucide-react';
 import Link from 'next/link';
 import { useDebounce } from '@/hooks/use-debounce';
 
@@ -24,18 +24,13 @@ interface Variant {
 }
 
 interface LineItem {
-    // Type: 'product' = linked to a variant, 'raw' = free-text raw material
-    type: 'product' | 'raw';
+    type: 'product';
     variantId?: string;
     variantLabel?: string;
-    itemName?: string;
-    unit?: string;
     quantity: number;
     unitCost: number;
     updateVariantCost: boolean;
 }
-
-const COMMON_UNITS = ['kg', 'g', 'litre', 'ml', 'piece', 'box', 'bag', 'bottle', 'pack', 'dozen'];
 
 export default function NewPurchaseOrderPage() {
     const router = useRouter();
@@ -44,24 +39,18 @@ export default function NewPurchaseOrderPage() {
 
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [supplierId, setSupplierId] = useState('');
-    const [expectedDate, setExpectedDate] = useState('');
+    const [expectedDate, setExpectedDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<LineItem[]>([]);
 
     // Add-item mode
-    const [addMode, setAddMode] = useState<'product' | 'raw' | null>(null);
+    const [addMode, setAddMode] = useState<'product' | null>(null);
 
     // Product search
     const [variantSearch, setVariantSearch] = useState('');
     const debouncedVariantSearch = useDebounce(variantSearch, 300);
     const [variantResults, setVariantResults] = useState<Variant[]>([]);
     const [searchingVariants, setSearchingVariants] = useState(false);
-
-    // Raw material inline form
-    const [rawName, setRawName] = useState('');
-    const [rawUnit, setRawUnit] = useState('');
-    const [rawQty, setRawQty] = useState(1);
-    const [rawCost, setRawCost] = useState(0);
 
     useEffect(() => {
         fetch('/api/suppliers?limit=100')
@@ -72,7 +61,9 @@ export default function NewPurchaseOrderPage() {
     useEffect(() => {
         if (!debouncedVariantSearch.trim()) { setVariantResults([]); return; }
         setSearchingVariants(true);
-        fetch(`/api/products?search=${encodeURIComponent(debouncedVariantSearch)}&limit=10`)
+        const params = new URLSearchParams({ search: debouncedVariantSearch, limit: '10', purchasable: 'true' });
+        if (supplierId) params.append('supplierId', supplierId);
+        fetch(`/api/products?${params}`)
             .then(r => r.json())
             .then(d => {
                 const variants: Variant[] = [];
@@ -84,34 +75,20 @@ export default function NewPurchaseOrderPage() {
                 setVariantResults(variants);
             })
             .finally(() => setSearchingVariants(false));
-    }, [debouncedVariantSearch]);
+    }, [debouncedVariantSearch, supplierId]);
 
     const addProductVariant = (v: Variant) => {
         if (items.some(i => i.variantId === v.id)) return;
         setItems(prev => [...prev, {
             type: 'product',
             variantId: v.id,
-            variantLabel: `${v.product.name} â€” ${v.sku}`,
+            variantLabel: `${v.product.name} – ${v.sku}`,
             quantity: 1,
             unitCost: typeof v.cost === 'number' ? v.cost : v.price,
             updateVariantCost: true,
         }]);
         setVariantSearch('');
         setVariantResults([]);
-        setAddMode(null);
-    };
-
-    const addRawItem = () => {
-        if (!rawName.trim()) return;
-        setItems(prev => [...prev, {
-            type: 'raw',
-            itemName: rawName.trim(),
-            unit: rawUnit || undefined,
-            quantity: rawQty,
-            unitCost: rawCost,
-            updateVariantCost: false,
-        }]);
-        setRawName(''); setRawUnit(''); setRawQty(1); setRawCost(0);
         setAddMode(null);
     };
 
@@ -137,8 +114,8 @@ export default function NewPurchaseOrderPage() {
                     notes: notes || null,
                     items: items.map(i => ({
                         variantId: i.variantId ?? null,
-                        itemName: i.itemName ?? null,
-                        unit: i.unit ?? null,
+                        itemName: null,
+                        unit: null,
                         quantity: i.quantity,
                         unitCost: i.unitCost,
                         updateVariantCost: i.updateVariantCost,
@@ -167,7 +144,7 @@ export default function NewPurchaseOrderPage() {
                 </Link>
                 <div>
                     <h1 className="text-xl font-bold">New Purchase Order</h1>
-                    <p className="text-xs text-muted-foreground">Add products or raw materials from a supplier</p>
+                    <p className="text-xs text-muted-foreground">Add products from a supplier</p>
                 </div>
             </div>
 
@@ -184,7 +161,7 @@ export default function NewPurchaseOrderPage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="supplier">Supplier <span className="text-destructive">*</span></Label>
-                            <Select value={supplierId} onValueChange={setSupplierId}>
+                            <Select value={supplierId} onValueChange={v => { setSupplierId(v); setVariantSearch(''); setVariantResults([]); }}>
                                 <SelectTrigger id="supplier">
                                     <SelectValue placeholder="Select a supplier..." />
                                 </SelectTrigger>
@@ -219,33 +196,24 @@ export default function NewPurchaseOrderPage() {
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Items</CardTitle>
-                            <div className="flex gap-1.5">
-                                <Button
-                                    type="button"
-                                    variant={addMode === 'product' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className="h-7 text-xs gap-1"
-                                    onClick={() => setAddMode(prev => prev === 'product' ? null : 'product')}
-                                >
-                                    <Package className="h-3 w-3" />Product
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={addMode === 'raw' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className="h-7 text-xs gap-1"
-                                    onClick={() => setAddMode(prev => prev === 'raw' ? null : 'raw')}
-                                >
-                                    <Pencil className="h-3 w-3" />Raw Material
-                                </Button>
-                            </div>
+                            <Button
+                                type="button"
+                                variant={addMode === 'product' ? 'default' : 'outline'}
+                                size="sm"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => setAddMode(prev => prev === 'product' ? null : 'product')}
+                            >
+                                <Package className="h-3 w-3" />Add Product
+                            </Button>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {/* Add product by search */}
                         {addMode === 'product' && (
                             <div className="border rounded-md p-3 space-y-2 bg-muted/30">
-                                <p className="text-xs font-medium">Search product catalog</p>
+                                <p className="text-xs font-medium">
+                                    {supplierId ? 'Search products from this supplier' : 'Search product catalog'}
+                                </p>
                                 <div className="relative">
                                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                                     <Input
@@ -279,107 +247,79 @@ export default function NewPurchaseOrderPage() {
                             </div>
                         )}
 
-                        {/* Add raw material inline form */}
-                        {addMode === 'raw' && (
-                            <div className="border rounded-md p-3 space-y-3 bg-muted/30">
-                                <p className="text-xs font-medium">Add raw material / ingredient</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1 col-span-2">
-                                        <Label className="text-xs">Item Name <span className="text-destructive">*</span></Label>
-                                        <Input
-                                            placeholder="e.g. Flour, Chicken Breast, Olive Oil"
-                                            value={rawName}
-                                            onChange={e => setRawName(e.target.value)}
-                                            className="h-8 text-sm"
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Unit</Label>
-                                        <Select value={rawUnit} onValueChange={setRawUnit}>
-                                            <SelectTrigger className="h-8 text-sm">
-                                                <SelectValue placeholder="Select unit..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {COMMON_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Qty</Label>
-                                        <Input type="number" min={1} value={rawQty} onChange={e => setRawQty(parseInt(e.target.value) || 1)} className="h-8 text-sm" />
-                                    </div>
-                                    <div className="space-y-1 col-span-2">
-                                        <Label className="text-xs">Unit Cost</Label>
-                                        <Input type="number" min={0} step="0.01" value={rawCost} onChange={e => setRawCost(parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
-                                    </div>
-                                </div>
-                                <Button type="button" size="sm" className="h-7 text-xs" onClick={addRawItem} disabled={!rawName.trim()}>
-                                    <Plus className="h-3 w-3 mr-1" />Add Item
-                                </Button>
-                            </div>
-                        )}
-
                         {/* Items list */}
                         {items.length === 0 ? (
                             <p className="text-xs text-muted-foreground text-center py-4">
-                                Use the buttons above to add products or raw materials
+                                Use the button above to add products
                             </p>
                         ) : (
-                            <div className="space-y-1.5">
-                                <div className="grid grid-cols-[1fr_70px_80px_90px_28px] gap-2 text-[10px] font-medium text-muted-foreground px-1">
-                                    <span>Item</span><span>Qty</span><span>Unit Cost</span><span>Update Cost?</span><span />
-                                </div>
+                            <div className="space-y-2">
                                 {items.map((item, idx) => (
-                                    <div key={idx} className="grid grid-cols-[1fr_70px_80px_90px_28px] gap-2 items-center py-1 border-b last:border-0">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <Badge variant={item.type === 'product' ? 'default' : 'secondary'} className="text-[9px] px-1 py-0 shrink-0">
-                                                    {item.type === 'product' ? 'Product' : 'Raw'}
-                                                </Badge>
-                                                <p className="text-xs truncate">
-                                                    {item.type === 'product' ? item.variantLabel : item.itemName}
-                                                    {item.unit && <span className="text-muted-foreground ml-1">/{item.unit}</span>}
+                                    <div key={idx} className="border rounded-md p-3 space-y-2.5 bg-background">
+                                        {/* Name + delete */}
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                <Badge variant="default" className="text-[10px] px-1.5 py-0 shrink-0">Product</Badge>
+                                                <p className="text-sm font-medium leading-tight">
+                                                    {item.variantLabel}
                                                 </p>
                                             </div>
+                                            <Button
+                                                type="button" variant="ghost" size="icon"
+                                                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => removeItem(idx)}
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
                                         </div>
-                                        <Input
-                                            type="number" min={1}
-                                            value={item.quantity}
-                                            onChange={e => updateItem(idx, { quantity: parseInt(e.target.value) || 1 })}
-                                            className="h-7 text-xs px-1.5"
-                                        />
-                                        <Input
-                                            type="number" min={0} step="0.01"
-                                            value={item.unitCost}
-                                            onChange={e => updateItem(idx, { unitCost: parseFloat(e.target.value) || 0 })}
-                                            className="h-7 text-xs px-1.5"
-                                        />
-                                        <div className="flex items-center justify-center">
-                                            {item.type === 'product' ? (
+                                        {/* Qty + cost + line total */}
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <Label className="text-xs text-muted-foreground shrink-0">Qty</Label>
+                                                <Input
+                                                    type="number" min={1}
+                                                    value={item.quantity}
+                                                    onChange={e => updateItem(idx, { quantity: parseInt(e.target.value) || 1 })}
+                                                    className="h-7 w-16 text-xs"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-1.5 flex-1">
+                                                <Label className="text-xs text-muted-foreground shrink-0">Unit Cost</Label>
+                                                <Input
+                                                    type="number" min={0} step="0.01"
+                                                    value={item.unitCost}
+                                                    onChange={e => updateItem(idx, { unitCost: parseFloat(e.target.value) || 0 })}
+                                                    className="h-7 flex-1 text-xs"
+                                                />
+                                            </div>
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                                = <span className="font-semibold text-foreground">Rp {(item.quantity * item.unitCost).toLocaleString('id-ID')}</span>
+                                            </span>
+                                        </div>
+                                        {/* Update cost toggle (product only) */}
+                                        {item.type === 'product' && (
+                                            <div className="flex items-center gap-2 pt-0.5">
                                                 <Checkbox
+                                                    id={`update-cost-${idx}`}
                                                     checked={item.updateVariantCost}
                                                     onCheckedChange={v => updateItem(idx, { updateVariantCost: !!v })}
                                                 />
-                                            ) : (
-                                                <span className="text-[10px] text-muted-foreground">â€”</span>
-                                            )}
-                                        </div>
-                                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                                            onClick={() => removeItem(idx)}>
-                                            <Trash2 className="h-3 w-3" />
-                                        </Button>
+                                                <Label htmlFor={`update-cost-${idx}`} className="text-xs text-muted-foreground cursor-pointer">
+                                                    Update product cost when received
+                                                </Label>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
-                                <div className="border-t pt-2 text-xs text-right text-muted-foreground">
-                                    Total cost: <span className="font-semibold text-foreground">{totalCost.toFixed(2)}</span>
+                                <div className="pt-1 flex justify-end">
+                                    <span className="text-sm">Total: <span className="font-semibold">Rp {totalCost.toLocaleString('id-ID')}</span></span>
                                 </div>
                             </div>
                         )}
 
                         {items.some(i => i.type === 'product' && i.updateVariantCost) && (
-                            <p className="text-[11px] text-muted-foreground bg-muted/50 rounded px-2 py-1">
-                                âœ“ Checked items will have their product cost updated automatically when you receive stock.
+                            <p className="text-[11px] text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
+                                Items with "Update product cost when received" will update the product cost automatically on stock receipt.
                             </p>
                         )}
                     </CardContent>

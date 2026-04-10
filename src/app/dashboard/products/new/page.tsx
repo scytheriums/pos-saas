@@ -38,6 +38,8 @@ export default function NewProductPage() {
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [minStock, setMinStock] = useState(10);
     const [categoryId, setCategoryId] = useState<string>('');
+    const [isSellable, setIsSellable] = useState(true);
+    const [isPurchasable, setIsPurchasable] = useState(true);
 
     // SKU Settings
     const [skuSettings, setSkuSettings] = useState<{ autoGenerateSku: boolean; preview: string } | null>(null);
@@ -87,6 +89,8 @@ export default function NewProductPage() {
                 imageUrl,
                 minStock,
                 categoryId: categoryId === '__none__' ? null : (categoryId || null),
+                isSellable,
+                isPurchasable,
                 hasVariants,
                 ...(hasVariants ? {
                     options: options.map(opt => ({
@@ -155,12 +159,16 @@ export default function NewProductPage() {
                     imageUrl={imageUrl}
                     minStock={minStock}
                     categoryId={categoryId}
+                    isSellable={isSellable}
+                    isPurchasable={isPurchasable}
                     disabled={loading}
                     onNameChange={setName}
                     onDescriptionChange={setDescription}
                     onImageChange={setImageUrl}
                     onMinStockChange={setMinStock}
                     onCategoryChange={setCategoryId}
+                    onIsSellableChange={setIsSellable}
+                    onIsPurchasableChange={setIsPurchasable}
                 />
 
                 {/* Variant Toggle */}

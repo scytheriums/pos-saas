@@ -67,15 +67,31 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Active shift not found" }, { status: 404 });
         }
 
-        const payout = await prisma.pettyCashPayout.create({
+        const [payout] = await prisma.$transaction([
+            prisma.pettyCashPayout.create({
+                data: {
+                    amount: new Prisma.Decimal(Number(amount)),
+                    reason: String(reason).trim(),
+                    shiftId,
+                    tenantId,
+                    createdBy: userId,
+                },
+                include: { user: { select: { id: true, name: true } } },
+            }),
+        ]);
+
+        // Also record as an Expense so it appears in the expenses dashboard
+        await prisma.expense.create({
             data: {
                 amount: new Prisma.Decimal(Number(amount)),
-                reason: String(reason).trim(),
-                shiftId,
+                category: 'PETTY_CASH',
+                date: payout.createdAt,
+                notes: String(reason).trim(),
+                referenceType: 'PETTY_CASH',
+                referenceId: payout.id,
                 tenantId,
                 createdBy: userId,
             },
-            include: { user: { select: { id: true, name: true } } },
         });
 
         return NextResponse.json({ payout }, { status: 201 });
