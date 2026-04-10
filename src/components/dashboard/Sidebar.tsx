@@ -25,6 +25,10 @@ import {
     Timer,
     Receipt,
     Star,
+    Truck,
+    ShoppingBag,
+    Boxes,
+    Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -56,20 +60,50 @@ export function Sidebar() {
             children: [
                 { label: "All Products", href: "/dashboard/products", icon: Package },
                 { label: "Categories", href: "/dashboard/categories", icon: FolderTree },
+                { label: "Promotions", href: "/dashboard/promotions", icon: Percent },
+            ],
+        },
+        {
+            icon: Boxes,
+            label: "Inventory",
+            children: [
                 { label: "Adjustments", href: "/dashboard/inventory/adjustments", icon: ClipboardList },
+                { label: "Suppliers", href: "/dashboard/suppliers", icon: Truck },
+                { label: "Purchase Orders", href: "/dashboard/purchase-orders", icon: ShoppingBag },
             ],
         },
         {
             icon: Store,
-            label: t.sidebar.orders,
+            label: "Sales",
             children: [
                 { label: "All Orders", href: "/dashboard/orders", icon: Store },
-                { label: "Return", href: "/dashboard/returns", icon: RotateCcw },
+                { label: "Returns", href: "/dashboard/returns", icon: RotateCcw },
                 { label: "Shifts", href: "/dashboard/shifts", icon: Timer },
+            ],
+        },
+        {
+            icon: Wallet,
+            label: "Finance",
+            children: [
                 { label: "Expenses", href: "/dashboard/expenses", icon: Receipt },
             ],
         },
-        { icon: Percent, label: "Promotions", href: "/dashboard/promotions" },
+        {
+            icon: Users,
+            label: t.sidebar.customers,
+            children: [
+                { label: "All Customers", href: "/dashboard/customers", icon: Users },
+                { label: "Loyalty Program", href: "/dashboard/settings/loyalty", icon: Star },
+            ],
+        },
+        {
+            icon: UserCog,
+            label: t.sidebar.team,
+            children: [
+                { label: "Users", href: "/dashboard/users", icon: UserCog },
+                { label: "Roles & Permissions", href: "/dashboard/settings/roles", icon: Shield },
+            ],
+        },
         {
             icon: Settings,
             label: t.sidebar.settings,
@@ -79,10 +113,6 @@ export function Sidebar() {
                 { label: "POS Settings", href: "/dashboard/settings/pos", icon: Settings },
                 { label: "SKU Settings", href: "/dashboard/settings/sku", icon: Settings },
                 { label: "Localization", href: "/dashboard/settings/localization", icon: Globe },
-                { label: t.sidebar.customers, href: "/dashboard/customers", icon: Users },
-                { label: t.sidebar.team, href: "/dashboard/users", icon: UserCog },
-                { label: "Roles & Permissions", href: "/dashboard/settings/roles", icon: Shield },
-                { label: "Loyalty Program", href: "/dashboard/settings/loyalty", icon: Star },
                 { label: "Audit Log", href: "/dashboard/audit-logs", icon: BarChart3 },
             ],
         },

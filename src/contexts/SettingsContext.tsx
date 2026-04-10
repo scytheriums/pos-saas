@@ -21,6 +21,9 @@ export interface TenantSettings {
     soundEffects: boolean;
     barcodeScanner?: string | null;
 
+    // Inventory Settings
+    enableStockManagement: boolean;
+
     // Localization Settings
     language: string;
     currency: string;
@@ -49,6 +52,7 @@ const defaultSettings: TenantSettings = {
     showLogo: true,
     autoPrintReceipt: true,
     soundEffects: true,
+    enableStockManagement: true,
     language: 'en',
     currency: 'IDR',
     timezone: 'Asia/Jakarta',

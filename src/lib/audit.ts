@@ -36,7 +36,9 @@ export type AuditResource =
     | "SETTINGS"
     | "ROLE"
     | "RETURN"
-    | "STOCK_ADJUSTMENT";
+    | "STOCK_ADJUSTMENT"
+    | "SUPPLIER"
+    | "PURCHASE_ORDER";
 
 /**
  * Log an audit event

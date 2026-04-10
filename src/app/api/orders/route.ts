@@ -119,10 +119,28 @@ export async function POST(req: NextRequest) {
         const { tenantId, name: cashierName } = authResult.user;
 
         const body = await req.json();
-        const { items, total, paymentMethod, cashTendered, change, customerName, customerId, discountId, discountAmount, paymentEntries, shiftId, redeemPoints } = body;
+        const { items, total, paymentMethod, cashTendered, change, customerName, customerId, discountId, discountAmount, paymentEntries, shiftId, redeemPoints, offlineClientId, clientLastModifiedAt } = body;
 
         if (!items || items.length === 0) {
             return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+        }
+
+        // Server-wins deduplication: if this offline order was already synced, return the existing order
+        if (offlineClientId) {
+            const existing = await prisma.order.findUnique({
+                where: { offlineClientId },
+                include: { items: true, paymentEntries: true },
+            });
+            if (existing) {
+                // Order already on server — if server's lastModifiedAt >= client's, server wins (return as-is)
+                const serverMs = existing.lastModifiedAt.getTime();
+                const clientMs = clientLastModifiedAt ? Number(clientLastModifiedAt) : 0;
+                if (serverMs >= clientMs) {
+                    return NextResponse.json({ order: existing, stockWarnings: [], pointsEarned: 0 }, { status: 200 });
+                }
+                // Client would be newer (unusual for POS) — still server-wins, return existing
+                return NextResponse.json({ order: existing, stockWarnings: [], pointsEarned: 0 }, { status: 200 });
+            }
         }
 
         // Validate payment entries if provided
@@ -134,14 +152,21 @@ export async function POST(req: NextRequest) {
         }
 
         const result = await prisma.$transaction(async (tx) => {
-            // 0. Load tenant loyalty settings
+            // 0. Load tenant settings
             const tenantSettings = await tx.tenant.findUnique({
                 where: { id: tenantId },
-                select: { pointsPerCurrency: true, pointRedemptionRate: true, minimumRedeemPoints: true },
+                select: {
+                    pointsPerCurrency: true,
+                    pointRedemptionRate: true,
+                    minimumRedeemPoints: true,
+                    enableStockManagement: true,
+                },
             });
             const pointsPerCurrency = Number(tenantSettings?.pointsPerCurrency ?? 0);
             const pointRedemptionRate = Number(tenantSettings?.pointRedemptionRate ?? 0);
             const minimumRedeemPoints = Number(tenantSettings?.minimumRedeemPoints ?? 0);
+            const stockEnabled = tenantSettings?.enableStockManagement !== false;
+
             // 1. Validate Stock Availability and fetch variant data
             const stockWarnings: string[] = [];
             const stockErrors: string[] = [];
@@ -171,31 +196,33 @@ export async function POST(req: NextRequest) {
                     continue;
                 }
 
-                // Check if sufficient stock
-                if (variant.stock < item.quantity) {
-                    stockErrors.push(
-                        `Insufficient stock for ${variant.product.name} (${variant.sku}). ` +
-                        `Available: ${variant.stock}, Requested: ${item.quantity}`
-                    );
+                if (stockEnabled) {
+                    // Check if sufficient stock
+                    if (variant.stock < item.quantity) {
+                        stockErrors.push(
+                            `Insufficient stock for ${variant.product.name} (${variant.sku}). ` +
+                            `Available: ${variant.stock}, Requested: ${item.quantity}`
+                        );
+                    }
+
+                    // Warn if stock will go below minimum threshold
+                    const newStock = variant.stock - item.quantity;
+                    if (newStock < variant.product.minStock && newStock >= 0) {
+                        stockWarnings.push(
+                            `${variant.product.name} (${variant.sku}) will be low on stock after this order. ` +
+                            `New stock: ${newStock}, Minimum: ${variant.product.minStock}`
+                        );
+                    }
                 }
 
-                // Warn if stock will go below minimum threshold
-                const newStock = variant.stock - item.quantity;
-                if (newStock < variant.product.minStock && newStock >= 0) {
-                    stockWarnings.push(
-                        `${variant.product.name} (${variant.sku}) will be low on stock after this order. ` +
-                        `New stock: ${newStock}, Minimum: ${variant.product.minStock}`
-                    );
-                }
-
-                // Store variant data for order creation
+                // Store variant data for order creation (price/cost snapshot always needed)
                 variantDataMap.set(variantId, {
                     price: Number(variant.price),
                     cost: Number(variant.cost)
                 });
             }
 
-            // If there are stock errors, abort transaction
+            // If there are stock errors, abort transaction (only when stock management is on)
             if (stockErrors.length > 0) {
                 throw new Error(stockErrors.join('; '));
             }
@@ -217,6 +244,7 @@ export async function POST(req: NextRequest) {
                     discountId: discountId || null,
                     discountAmount: discountAmount ? new Prisma.Decimal(discountAmount) : new Prisma.Decimal(0),
                     shiftId: shiftId || null,
+                    offlineClientId: offlineClientId || null,
                     items: {
                         create: items.map((item: any) => {
                             const variantId = item.variantId || item.id;
@@ -247,18 +275,20 @@ export async function POST(req: NextRequest) {
                 }
             });
 
-            // 3. Update Stock (only variants confirmed found in validation step)
-            for (const item of items) {
-                const variantId = item.variantId || item.id;
-                if (!variantDataMap.has(variantId)) continue;
-                await tx.productVariant.update({
-                    where: { id: variantId },
-                    data: {
-                        stock: {
-                            decrement: Math.floor(Number(item.quantity))
+            // 3. Update Stock (only when stock management is enabled)
+            if (stockEnabled) {
+                for (const item of items) {
+                    const variantId = item.variantId || item.id;
+                    if (!variantDataMap.has(variantId)) continue;
+                    await tx.productVariant.update({
+                        where: { id: variantId },
+                        data: {
+                            stock: {
+                                decrement: Math.floor(Number(item.quantity))
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
 
             // 4. Loyalty points — redeem and/or award

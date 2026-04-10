@@ -35,6 +35,8 @@ const EXPENSE_CATEGORIES = [
     { value: 'TRANSPORT', label: 'Transport' },
     { value: 'FOOD', label: 'Food & Beverage' },
     { value: 'TAX', label: 'Tax' },
+    { value: 'PURCHASE_ORDER', label: 'Purchase Order' },
+    { value: 'PETTY_CASH', label: 'Petty Cash' },
     { value: 'OTHER', label: 'Other' },
 ];
 
@@ -48,6 +50,8 @@ const CATEGORY_COLORS: Record<string, string> = {
     TRANSPORT: 'bg-cyan-100 text-cyan-700',
     FOOD: 'bg-green-100 text-green-700',
     TAX: 'bg-gray-100 text-gray-700',
+    PURCHASE_ORDER: 'bg-indigo-100 text-indigo-700',
+    PETTY_CASH: 'bg-teal-100 text-teal-700',
     OTHER: 'bg-slate-100 text-slate-700',
 };
 
@@ -57,6 +61,8 @@ interface Expense {
     category: string;
     date: string;
     notes: string | null;
+    referenceType: string | null;
+    referenceId: string | null;
     user?: { id: string; name: string } | null;
     createdAt: string;
 }
@@ -186,6 +192,7 @@ export default function ExpensesPage() {
     };
 
     const openEditModal = (expense: Expense) => {
+        if (expense.referenceType) return; // auto-generated — read-only
         setEditingExpense(expense);
         setForm({
             amount: String(expense.amount),
@@ -334,9 +341,16 @@ export default function ExpensesPage() {
                             expenses.map((expense) => (
                                 <div key={expense.id} className="p-4 space-y-1.5">
                                     <div className="flex items-center justify-between">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[expense.category] ?? 'bg-gray-100 text-gray-700'}`}>
-                                            {EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.label ?? expense.category}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[expense.category] ?? 'bg-gray-100 text-gray-700'}`}>
+                                                {EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.label ?? expense.category}
+                                            </span>
+                                            {expense.referenceType && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border">
+                                                    Auto
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className="font-semibold text-sm">{formatCurrencyWithSettings(Number(expense.amount), settings)}</span>
                                     </div>
                                     <div className="text-xs text-muted-foreground">
@@ -347,9 +361,11 @@ export default function ExpensesPage() {
                                         <p className="text-xs text-muted-foreground truncate">{expense.notes}</p>
                                     )}
                                     <div className="flex justify-end gap-1 pt-1">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(expense)}>
-                                            <Pencil className="w-3.5 h-3.5" />
-                                        </Button>
+                                        {!expense.referenceType && (
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(expense)}>
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </Button>
+                                        )}
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(expense)}>
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </Button>
@@ -392,9 +408,16 @@ export default function ExpensesPage() {
                                                 {formatDateWithSettings(new Date(expense.date), settings)}
                                             </TableCell>
                                             <TableCell>
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[expense.category] ?? 'bg-gray-100 text-gray-700'}`}>
-                                                    {EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.label ?? expense.category}
-                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[expense.category] ?? 'bg-gray-100 text-gray-700'}`}>
+                                                        {EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.label ?? expense.category}
+                                                    </span>
+                                                    {expense.referenceType && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border">
+                                                            Auto
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                                                 {expense.notes ?? '—'}
@@ -407,9 +430,11 @@ export default function ExpensesPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(expense)}>
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </Button>
+                                                    {!expense.referenceType && (
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(expense)}>
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    )}
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(expense)}>
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </Button>

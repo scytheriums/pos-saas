@@ -12,6 +12,7 @@ import { OpenShiftModal, CloseShiftModal, type Shift } from "@/components/pos/Sh
 import { PettyCashModal } from "@/components/pos/PettyCashModal";
 import { OfflineIndicator } from "@/components/pos/OfflineIndicator";
 import { db } from "@/lib/db";
+import { enqueueSyncOrder } from "@/lib/sync";
 import Link from "next/link";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { VariantSelector } from "@/components/pos/VariantSelector";
@@ -590,11 +591,13 @@ export default function POSPage() {
                 const data = await res.json();
                 processSuccessfulOrder(data.order.id, "Current Cashier", false, paymentEntries, data.pointsEarned ?? 0); // Replace with actual cashier name
             } else {
-                // Offline fallback
+                // Offline fallback — generate a UUID for deduplication
+                const offlineClientId = crypto.randomUUID();
+                const now = Date.now();
                 const offlineId = await db.orders.add({
                     items: orderData.items,
                     total: orderData.total,
-                    timestamp: Date.now(),
+                    timestamp: now,
                     synced: false,
                     tenantId: orderData.tenantId,
                     paymentMethod: primaryMethod,
@@ -602,8 +605,12 @@ export default function POSPage() {
                     change: orderData.change,
                     customerId: orderData.customerId,
                     discountId: orderData.discountId,
-                    discountAmount: orderData.discountAmount
+                    discountAmount: orderData.discountAmount,
+                    offlineClientId,
+                    lastModifiedAt: now,
                 });
+                // Add to sync queue for retry when back online
+                await enqueueSyncOrder(offlineId as number);
                 processSuccessfulOrder(`OFF-${offlineId}`, "Offline Cashier", true, paymentEntries);
             }
         } catch (error) {

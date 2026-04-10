@@ -99,6 +99,7 @@ export default function LocalizationSettingsPage() {
         showLogo: true,
         autoPrintReceipt: false,
         soundEffects: false,
+        enableStockManagement: true,
         pointsPerCurrency: 0,
         pointRedemptionRate: 0,
         minimumRedeemPoints: 0,

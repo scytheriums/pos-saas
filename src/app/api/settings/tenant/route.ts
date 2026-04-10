@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
                 autoPrintReceipt: true,
                 soundEffects: true,
                 barcodeScanner: true,
+                // Inventory Settings
+                enableStockManagement: true,
                 // Localization Settings
                 language: true,
                 currency: true,
@@ -78,6 +80,8 @@ export async function PATCH(req: NextRequest) {
             receiptHeader, receiptFooter, showLogo, logoUrl,
             // POS Settings
             autoPrintReceipt, soundEffects, barcodeScanner,
+            // Inventory Settings
+            enableStockManagement,
             // Localization Settings
             language, currency, timezone, dateFormat, timeFormat,
             // Loyalty Settings
@@ -102,6 +106,8 @@ export async function PATCH(req: NextRequest) {
                 autoPrintReceipt,
                 soundEffects,
                 barcodeScanner,
+                // Inventory Settings
+                enableStockManagement,
                 // Localization Settings
                 language,
                 currency,

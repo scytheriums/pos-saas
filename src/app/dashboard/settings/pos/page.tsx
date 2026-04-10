@@ -9,13 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const posFormSchema = z.object({
     autoPrintReceipt: z.boolean().optional().default(true),
     soundEffects: z.boolean().optional().default(true),
     barcodeScanner: z.string().optional(),
+    enableStockManagement: z.boolean().default(true),
 });
 
 type PosFormValues = z.infer<typeof posFormSchema>;
@@ -23,6 +24,7 @@ type PosFormValues = z.infer<typeof posFormSchema>;
 export default function PosSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [forcesyncing, setForcesyncing] = useState(false);
 
     const form = useForm<PosFormValues>({
         resolver: zodResolver(posFormSchema) as any,
@@ -30,6 +32,7 @@ export default function PosSettingsPage() {
             autoPrintReceipt: true,
             soundEffects: true,
             barcodeScanner: "none",
+            enableStockManagement: true,
         },
     });
 
@@ -46,6 +49,7 @@ export default function PosSettingsPage() {
                     autoPrintReceipt: data.autoPrintReceipt !== false,
                     soundEffects: data.soundEffects !== false,
                     barcodeScanner: data.barcodeScanner || "none",
+                    enableStockManagement: data.enableStockManagement !== false,
                 });
             }
         } catch (error) {
@@ -73,6 +77,26 @@ export default function PosSettingsPage() {
             toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleForceSync = async () => {
+        if (forcesyncing) return;
+        setForcesyncing(true);
+        try {
+            // Dynamically import sync functions (client-only, Dexie-based)
+            const { retryAllFailed, processSyncQueue } = await import('@/lib/sync');
+            await retryAllFailed();
+            const result = await processSyncQueue();
+            if (result.synced > 0 || result.failed === 0) {
+                toast.success(`Sync complete — ${result.synced} order(s) uploaded.`);
+            } else {
+                toast.error(`Sync finished with ${result.failed} failed order(s). Check network and retry.`);
+            }
+        } catch (error) {
+            toast.error("Force sync failed. Please try again.");
+        } finally {
+            setForcesyncing(false);
         }
     };
 
@@ -159,6 +183,37 @@ export default function PosSettingsPage() {
 
                     <Card>
                         <CardHeader>
+                            <CardTitle>Inventory</CardTitle>
+                            <CardDescription>
+                                Control whether the POS tracks and enforces stock levels
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="enableStockManagement"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                        <div className="space-y-0.5">
+                                            <FormLabel>Stock Management</FormLabel>
+                                            <FormDescription>
+                                                When enabled, the POS checks stock availability, blocks overselling, and decrements stock after each sale. Disable for service-based or non-inventory businesses.
+                                            </FormDescription>
+                                        </div>
+                                        <FormControl>
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
                             <CardTitle>Hardware Configuration</CardTitle>
                             <CardDescription>
                                 Configure connected hardware devices
@@ -202,6 +257,29 @@ export default function PosSettingsPage() {
                     </div>
                 </form>
             </Form>
+
+            {/* Offline Sync — outside the form */}
+            <Card className="max-w-2xl">
+                <CardHeader>
+                    <CardTitle>Offline Sync</CardTitle>
+                    <CardDescription>
+                        Manually push any offline orders that are waiting to sync to the server.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button
+                        variant="outline"
+                        onClick={handleForceSync}
+                        disabled={forcesyncing}
+                    >
+                        {forcesyncing
+                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            : <RefreshCw className="mr-2 h-4 w-4" />
+                        }
+                        {forcesyncing ? 'Syncing…' : 'Force Sync Now'}
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
     );
 }

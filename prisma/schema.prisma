@@ -89,6 +89,9 @@ model Tenant {
   skuPrefix       String?
   skuCounter      Int     @default(1)
 
+  // Inventory Settings
+  enableStockManagement Boolean @default(true) // When false, POS skips all stock checks and decrements
+
   // Loyalty Program Settings
   pointsPerCurrency    Decimal @default(0) @db.Decimal(10, 4) // Points earned per 1 unit of currency
   pointRedemptionRate  Decimal @default(0) @db.Decimal(10, 4) // Discount per 1 point redeemed
@@ -109,6 +112,8 @@ model Tenant {
   shifts           Shift[]
   expenses         Expense[]
   pettyCashPayouts PettyCashPayout[]
+  suppliers        Supplier[]
+  purchaseOrders   PurchaseOrder[]
 }
 
 model User {
@@ -127,9 +132,10 @@ model User {
   accounts      Account[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  shifts        Shift[]
-  expenses      Expense[]
+  shifts           Shift[]
+  expenses         Expense[]
   pettyCashPayouts PettyCashPayout[]
+  purchaseOrders   PurchaseOrder[]
 
   @@index([tenantId])
 }
@@ -225,10 +231,12 @@ model Product {
   imageUrl    String? // Main product image
   minStock    Int     @default(10)
   categoryId  String?
+  supplierId  String?
   tenantId    String
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id])
   category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -241,7 +249,9 @@ model Product {
   options  ProductOption[]
   variants ProductVariant[]
 
+  @@index([tenantId])
   @@index([name])
+  @@index([categoryId])
 }
 
 model ProductUnit {
@@ -284,9 +294,10 @@ model ProductVariant {
   // The combination of values that make up this variant
   optionValues ProductOptionValue[]
 
-  orderItems       OrderItem[]
-  stockAdjustments StockAdjustment[]
-  returnItems      ReturnItem[]
+  orderItems         OrderItem[]
+  stockAdjustments   StockAdjustment[]
+  returnItems        ReturnItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([sku])
 }
@@ -337,6 +348,15 @@ model Order {
   discountAmount Decimal?
   returns        Return[]
   createdAt      DateTime       @default(now())
+  lastModifiedAt DateTime       @default(now()) @updatedAt
+  offlineClientId String?       @unique // UUID generated client-side for offline deduplication
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([customerId])
 }
 
 model PaymentEntry {
@@ -345,6 +365,8 @@ model PaymentEntry {
   order    Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   method   PaymentMethod
   amount   Decimal
+
+  @@index([orderId])
 }
 
 enum ShiftStatus {
@@ -403,6 +425,10 @@ model OrderItem {
   price        Decimal // Snapshot of price at time of sale
   cost         Decimal @default(0) // Snapshot of cost at time of sale
   itemDiscount Decimal @default(0) // Per-item discount amount
+  lastModifiedAt DateTime @default(now()) @updatedAt
+
+  @@index([orderId])
+  @@index([variantId])
 }
 
 model StockAdjustment {
@@ -416,6 +442,10 @@ model StockAdjustment {
   tenantId         String
   tenant           Tenant           @relation(fields: [tenantId], references: [id])
   createdAt        DateTime         @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([productVariantId])
 }
 
 model Customer {
@@ -602,23 +632,105 @@ enum ExpenseCategory {
   TRANSPORT
   FOOD
   TAX
+  PURCHASE_ORDER
+  PETTY_CASH
   OTHER
 }
 
 model Expense {
-  id         String          @id @default(cuid())
-  amount     Decimal         @db.Decimal(10, 2)
-  category   ExpenseCategory @default(OTHER)
-  date       DateTime        @default(now())
-  notes      String?
-  tenantId   String
-  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy  String
-  user       User            @relation(fields: [createdBy], references: [id])
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  amount        Decimal         @db.Decimal(10, 2)
+  category      ExpenseCategory @default(OTHER)
+  date          DateTime        @default(now())
+  notes         String?
+  // Polymorphic source reference — e.g. "PURCHASE_ORDER" or "PETTY_CASH"
+  referenceType String?
+  referenceId   String?
+  tenantId      String
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy     String
+  user          User            @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, date])
   @@index([createdBy])
+  @@index([referenceType, referenceId])
+}
+
+// ─── Supplier Management ─────────────────────────────────────────────────────
+
+model Supplier {
+  id           String   @id @default(cuid())
+  name         String
+  contactName  String?
+  phone        String?
+  email        String?
+  address      String?
+  paymentTerms String?  // e.g. "Net 30", "COD"
+  notes        String?
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// ─── Purchase Orders ──────────────────────────────────────────────────────────
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  status       PurchaseOrderStatus @default(DRAFT)
+  expectedDate DateTime?
+  notes        String?
+  tenantId     String
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy    String
+  user         User                @relation(fields: [createdBy], references: [id])
+
+  items PurchaseOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model PurchaseOrderItem {
+  id               String         @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  // Linked to a product variant (optional — can be a free-text raw material)
+  variantId        String?
+  variant          ProductVariant? @relation(fields: [variantId], references: [id])
+  // Free-text item for raw materials / ingredients not in the product catalog
+  itemName         String?
+  unit             String?        // e.g. "kg", "litre", "bag", "piece"
+  quantity         Int
+  receivedQuantity Int            @default(0)
+  unitCost         Decimal        @db.Decimal(10, 2)
+  // When true, receiving this item will update the linked variant's cost field
+  updateVariantCost Boolean       @default(false)
+
+  @@index([purchaseOrderId])
+  @@index([variantId])
 }

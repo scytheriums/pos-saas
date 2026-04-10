@@ -26,6 +26,8 @@ import {
     Receipt,
     Star,
     Barcode,
+    Truck,
+    ShoppingBag,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -35,27 +37,50 @@ const PRIMARY_TABS = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/analytics" },
     { icon: ShoppingCart, label: "POS", href: "/pos" },
     { icon: Package, label: "Products", href: "/dashboard/products" },
-    { icon: Store, label: "Orders", href: "/dashboard/orders" },
+    { icon: Store, label: "Sales", href: "/dashboard/orders" },
 ];
 
 const MORE_SECTIONS = [
     {
-        title: "Catalog",
+        title: "Products",
         items: [
             { icon: FolderTree, label: "Categories", href: "/dashboard/categories" },
-            { icon: ClipboardList, label: "Adjustments", href: "/dashboard/inventory/adjustments" },
             { icon: Percent, label: "Promotions", href: "/dashboard/promotions" },
-            { icon: RotateCcw, label: "Returns", href: "/dashboard/returns" },
         ],
     },
     {
-        title: "Manage",
+        title: "Inventory",
+        items: [
+            { icon: ClipboardList, label: "Adjustments", href: "/dashboard/inventory/adjustments" },
+            { icon: Truck, label: "Suppliers", href: "/dashboard/suppliers" },
+            { icon: ShoppingBag, label: "Purchase Orders", href: "/dashboard/purchase-orders" },
+        ],
+    },
+    {
+        title: "Sales",
+        items: [
+            { icon: RotateCcw, label: "Returns", href: "/dashboard/returns" },
+            { icon: Timer, label: "Shifts", href: "/dashboard/shifts" },
+        ],
+    },
+    {
+        title: "Finance",
+        items: [
+            { icon: Receipt, label: "Expenses", href: "/dashboard/expenses" },
+        ],
+    },
+    {
+        title: "Customers",
         items: [
             { icon: Users, label: "Customers", href: "/dashboard/customers" },
-            { icon: Timer, label: "Shifts", href: "/dashboard/shifts" },
-            { icon: Receipt, label: "Expenses", href: "/dashboard/expenses" },
+            { icon: Star, label: "Loyalty", href: "/dashboard/settings/loyalty" },
+        ],
+    },
+    {
+        title: "Team",
+        items: [
             { icon: UserCog, label: "Team", href: "/dashboard/users" },
-            { icon: BarChart3, label: "Audit Log", href: "/dashboard/audit-logs" },
+            { icon: Shield, label: "Roles", href: "/dashboard/settings/roles" },
         ],
     },
     {
@@ -65,9 +90,8 @@ const MORE_SECTIONS = [
             { icon: FileText, label: "Receipt", href: "/dashboard/settings/receipt" },
             { icon: Settings, label: "POS", href: "/dashboard/settings/pos" },
             { icon: Globe, label: "Localization", href: "/dashboard/settings/localization" },
-            { icon: Star, label: "Loyalty", href: "/dashboard/settings/loyalty" },
             { icon: Barcode, label: "SKU", href: "/dashboard/settings/sku" },
-            { icon: Shield, label: "Roles", href: "/dashboard/settings/roles" },
+            { icon: BarChart3, label: "Audit Log", href: "/dashboard/audit-logs" },
         ],
     },
 ];
