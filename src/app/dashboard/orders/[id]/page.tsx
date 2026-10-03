@@ -45,6 +45,7 @@ interface OrderDetails {
                 name: string;
             };
             optionValues: { value: string }[];
+            unit?: { name: string } | null;
         };
     }[];
 }
@@ -368,7 +369,7 @@ export default function OrderDetailsPage() {
                     price: Number(item.price),
                     variantName: item.variant.optionValues.length > 0
                         ? item.variant.optionValues.map(ov => ov.value).join(' / ')
-                        : undefined,
+                        : item.variant.unit?.name ?? undefined,
                     itemDiscount: Number(item.itemDiscount || 0) > 0 ? Number(item.itemDiscount) : undefined,
                 }))}
                 subtotal={subtotal}

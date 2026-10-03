@@ -37,7 +37,8 @@ export async function GET(
                                     select: {
                                         value: true
                                     }
-                                }
+                                },
+                                unit: { select: { name: true } }
                             }
                         }
                     },

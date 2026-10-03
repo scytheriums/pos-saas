@@ -23,7 +23,9 @@ export default function NewProductPage() {
                 price: v.price,
                 cost: v.cost,
                 stock: v.stock,
-                imageUrl: v.imageUrl
+                imageUrl: v.imageUrl,
+                unitId: v.unitId ?? null,
+                conversionFactor: v.conversionFactor ?? 1
             }))
         };
 

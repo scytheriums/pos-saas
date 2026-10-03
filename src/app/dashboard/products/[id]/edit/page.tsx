@@ -29,6 +29,10 @@ interface ApiProduct {
     categoryId: string | null;
     isSellable?: boolean;
     isPurchasable?: boolean;
+    stockMode?: 'PER_VARIANT' | 'SHARED_POOL';
+    baseUnitId?: string | null;
+    sharedStock?: number;
+    poolCost?: string | number;
     options?: { id: string; name: string; values?: { id: string; value: string }[] }[];
     variants?: {
         id: string;
@@ -37,6 +41,8 @@ interface ApiProduct {
         cost: string | number;
         stock: number;
         imageUrl?: string | null;
+        unitId?: string | null;
+        conversionFactor?: number;
         optionValues?: { id: string }[];
     }[];
 }
@@ -76,8 +82,12 @@ export default function EditProductPage() {
                 categoryId: data.categoryId || '__none__',
                 isSellable: data.isSellable ?? true,
                 isPurchasable: data.isPurchasable ?? true,
-                hasVariants: options.length > 0,
+                hasVariants: options.length > 0 || data.stockMode === 'SHARED_POOL',
                 options,
+                stockMode: data.stockMode ?? 'PER_VARIANT',
+                baseUnitId: data.baseUnitId ?? null,
+                sharedStock: data.sharedStock ?? 0,
+                poolCost: Number(data.poolCost ?? 0),
                 variants: (data.variants ?? []).map(v => ({
                     id: v.id,
                     optionValueIds: (v.optionValues ?? []).map(ov => ov.id),
@@ -85,7 +95,9 @@ export default function EditProductPage() {
                     price: Number(v.price),
                     cost: Number(v.cost),
                     stock: v.stock,
-                    imageUrl: v.imageUrl ?? null
+                    imageUrl: v.imageUrl ?? null,
+                    unitId: v.unitId ?? null,
+                    conversionFactor: v.conversionFactor ?? 1
                 }))
             });
         } catch (err) {

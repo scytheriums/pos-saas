@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma, PaymentMethod } from "@prisma/client";
 import { calculateOrderTotals, lineDiscount } from "@/lib/order-totals";
 import { netPaymentEntries } from "@/lib/shift-cash";
+import { loadStockTargets, groupDemand, checkAvailability, takeStock } from "@/lib/stock";
 import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logCrudAudit } from "@/lib/audit";
 
@@ -189,59 +190,24 @@ export async function POST(req: NextRequest) {
             const minimumRedeemPoints = Number(tenantSettings?.minimumRedeemPoints ?? 0);
             const stockEnabled = tenantSettings?.enableStockManagement !== false;
 
-            // 1. Load variants (this tenant only) and check stock per variant across all cart lines
+            // 1. How many of each variant the cart holds
             const qtyByVariant = new Map<string, number>();
             for (const item of items as IncomingItem[]) {
                 const variantId = (item.variantId || item.id)!;
                 qtyByVariant.set(variantId, (qtyByVariant.get(variantId) ?? 0) + Number(item.quantity));
             }
 
-            const stockWarnings: string[] = [];
-            const stockErrors: string[] = [];
-            const variantDataMap = new Map<string, { price: number; cost: number }>();
-
-            for (const [variantId, quantity] of qtyByVariant) {
-                const variant = await tx.productVariant.findFirst({
-                    where: { id: variantId, product: { tenantId } },
-                    select: {
-                        id: true,
-                        stock: true,
-                        sku: true,
-                        price: true,
-                        cost: true,
-                        product: {
-                            select: {
-                                name: true,
-                                minStock: true
-                            }
-                        }
-                    }
-                });
-
-                if (!variant) {
-                    throw new CheckoutError("One of the products in the cart no longer exists. Remove it and try again.");
-                }
-
-                if (stockEnabled) {
-                    if (variant.stock < quantity) {
-                        stockErrors.push(`${variant.product.name} (${variant.sku}): ${variant.stock} in stock, ${quantity} in cart`);
-                    }
-
-                    // Warn if stock will go below minimum threshold
-                    const newStock = variant.stock - quantity;
-                    if (newStock < variant.product.minStock && newStock >= 0) {
-                        stockWarnings.push(
-                            `${variant.product.name} (${variant.sku}) will be low on stock after this order. ` +
-                            `New stock: ${newStock}, Minimum: ${variant.product.minStock}`
-                        );
-                    }
-                }
-
-                variantDataMap.set(variantId, {
-                    price: Number(variant.price),
-                    cost: Number(variant.cost)
-                });
+            // Variants of this tenant only; pooled products' lines add up per pool (1 tray + 5 pcs = 35 pcs)
+            const targets = await loadStockTargets(tx, [...qtyByVariant.keys()], tenantId);
+            if (targets.size !== qtyByVariant.size) {
+                throw new CheckoutError("One of the products in the cart no longer exists. Remove it and try again.");
             }
+            const demands = groupDemand(targets, qtyByVariant);
+            const { errors: stockErrors, warnings: stockWarnings } = stockEnabled
+                ? checkAvailability(demands)
+                : { errors: [] as string[], warnings: [] as string[] };
+
+            const variantDataMap = new Map([...targets].map(([id, t]) => [id, { price: t.price, cost: t.cost }]));
 
             if (stockErrors.length > 0) {
                 if (!isOfflineSync) {
@@ -389,25 +355,12 @@ export async function POST(req: NextRequest) {
                 }
             });
 
-            // 6. Update Stock (only when stock management is enabled)
+            // 6. Update Stock (only when stock management is enabled). Atomic per stock place, so a sale at
+            // another till that took the stock since the check above makes this one fail instead of overselling.
             if (stockEnabled) {
-                for (const [variantId, quantity] of qtyByVariant) {
-                    if (isOfflineSync) {
-                        await tx.productVariant.update({
-                            where: { id: variantId },
-                            data: { stock: { decrement: quantity } }
-                        });
-                        continue;
-                    }
-                    // Decrement only if the stock is still there: a sale at another till may have taken it
-                    // since the check above. Atomic in the database, so two sales can't both take the last unit.
-                    const taken = await tx.productVariant.updateMany({
-                        where: { id: variantId, stock: { gte: quantity } },
-                        data: { stock: { decrement: quantity } }
-                    });
-                    if (taken.count === 0) {
-                        throw new CheckoutError("Another sale just took the last of an item in this cart. Check stock and try again.");
-                    }
+                const taken = await takeStock(tx, demands, { allowNegative: isOfflineSync });
+                if (!taken) {
+                    throw new CheckoutError("Another sale just took the last of an item in this cart. Check stock and try again.");
                 }
             }
 

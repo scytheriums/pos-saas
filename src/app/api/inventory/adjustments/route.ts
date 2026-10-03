@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { putStock } from "@/lib/stock";
 import { getAuthUser, requirePermission } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -36,11 +37,15 @@ export async function POST(request: Request) {
 
         // Transaction to ensure atomicity
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Create the adjustment record
+            // 1. Move the stock: on the variant, or quantity × size in the product's shared pool
+            const moved = await putStock(tx, variantId, qty);
+
+            // 2. Record the adjustment (pooled products also keep the exact base units moved)
             const adjustment = await tx.stockAdjustment.create({
                 data: {
                     productVariantId: variantId,
                     quantity: qty,
+                    baseQuantity: moved.pooled ? moved.baseQuantity : null,
                     reason,
                     notes: notes || null,
                     userId: userId,
@@ -48,17 +53,14 @@ export async function POST(request: Request) {
                 },
             });
 
-            // 2. Update the product variant stock
-            const variant = await tx.productVariant.update({
+            // New stock where it lives: the variant's own count, or the pool in base units
+            const variant = await tx.productVariant.findUniqueOrThrow({
                 where: { id: variantId },
-                data: {
-                    stock: {
-                        increment: qty,
-                    },
-                },
+                select: { stock: true, product: { select: { sharedStock: true, baseUnit: { select: { abbreviation: true } } } } },
             });
-
-            return { adjustment, newStock: variant.stock };
+            return moved.pooled
+                ? { adjustment, newStock: variant.product.sharedStock, pooled: true, baseUnit: variant.product.baseUnit?.abbreviation ?? null }
+                : { adjustment, newStock: variant.stock, pooled: false, baseUnit: null };
         });
 
         return NextResponse.json(result);
@@ -97,8 +99,9 @@ export async function GET(request: Request) {
                 variant: {
                     include: {
                         product: {
-                            select: { name: true },
+                            select: { name: true, baseUnit: { select: { abbreviation: true } } },
                         },
+                        unit: { select: { name: true } },
                     },
                 },
             },

@@ -30,6 +30,9 @@ interface AssignedProduct {
     name: string;
     imageUrl: string | null;
     variants: { id: string; sku: string; stock: number; price: number }[];
+    stockMode?: 'PER_VARIANT' | 'SHARED_POOL';
+    sharedStock?: number;
+    baseUnit?: { abbreviation: string } | null;
 }
 
 interface PurchaseOrder {
@@ -396,7 +399,10 @@ export default function EditSupplierPage({ params }: { params: Promise<{ id: str
                     ) : (
                         <div className="space-y-1.5">
                             {products.map(product => {
-                                const totalStock = product.variants.reduce((s, v) => s + v.stock, 0);
+                                // Shared-stock products: one count in base units, not a sum of pack sizes
+                                const totalStock = product.stockMode === 'SHARED_POOL'
+                                    ? `${product.sharedStock ?? 0} ${product.baseUnit?.abbreviation ?? ''}`.trim()
+                                    : product.variants.reduce((s, v) => s + v.stock, 0);
                                 const prices = product.variants.map(v => Number(v.price));
                                 const minPrice = Math.min(...prices);
                                 const maxPrice = Math.max(...prices);

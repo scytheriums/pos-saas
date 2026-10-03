@@ -205,6 +205,16 @@ model Unit {
   tenantId     String
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   productUnits ProductUnit[]
+  baseForProducts Product[]  @relation("ProductBaseUnit")
+  variants     ProductVariant[]
+
+  @@unique([tenantId, name])
+}
+
+// How a product counts stock
+enum StockMode {
+  PER_VARIANT // each variant has its own stock (default)
+  SHARED_POOL // one pool on the product in base units; variants are pack sizes of it
 }
 
 model Category {
@@ -246,8 +256,14 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Stock: per variant, or one shared pool counted in the base unit
+  stockMode   StockMode @default(PER_VARIANT)
+  sharedStock Int       @default(0) // SHARED_POOL only, in base units
+  poolCost    Decimal   @default(0) // SHARED_POOL only, cost per base unit
+
   // Base Unit (e.g. Pcs)
   baseUnitId String?
+  baseUnit   Unit?     @relation("ProductBaseUnit", fields: [baseUnitId], references: [id], onDelete: SetNull)
   // Conversions
   units      ProductUnit[]
 
@@ -292,7 +308,11 @@ model ProductVariant {
   price     Decimal
   cost      Decimal @default(0) // Cost price for profit calculation
   imageUrl  String? // Variant-specific image (optional)
-  stock     Int     @default(0) // Stock in Base Unit
+  stock     Int     @default(0) // Stock in Base Unit (PER_VARIANT only; 0 for SHARED_POOL products)
+  // Selling unit for SHARED_POOL products: 1 of this variant = conversionFactor base units
+  unitId           String?
+  unit             Unit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  conversionFactor Int     @default(1)
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -447,7 +467,8 @@ model StockAdjustment {
   id               String           @id @default(cuid())
   productVariantId String
   variant          ProductVariant   @relation(fields: [productVariantId], references: [id])
-  quantity         Int // Positive for increase, negative for decrease
+  quantity         Int // Positive for increase, negative for decrease (in the variant's unit)
+  baseQuantity     Int? // Base units moved, for SHARED_POOL products
   reason           AdjustmentReason
   notes            String?
   userId           String

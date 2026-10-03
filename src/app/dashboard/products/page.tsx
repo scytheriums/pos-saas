@@ -48,6 +48,9 @@ interface Product {
     tenantId: string;
     categoryId: string | null;
     createdAt: string;
+    stockMode?: 'PER_VARIANT' | 'SHARED_POOL';
+    sharedStock?: number;
+    baseUnit?: { abbreviation: string } | null;
     variants: Array<{
         id: string;
         sku: string;
@@ -163,7 +166,9 @@ export default function ProductsPage() {
         return true;
     });
 
+    // Shared-stock products have one count in base units (their variants' stock is derived from it)
     const getTotalStock = (product: Product) => {
+        if (product.stockMode === 'SHARED_POOL') return Math.max(0, product.sharedStock ?? 0);
         return product.variants.reduce((sum, v) => sum + v.stock, 0);
     };
 
@@ -388,7 +393,9 @@ export default function ProductsPage() {
                                             totalStock <= product.minStock ? 'text-orange-600 font-medium' :
                                             'text-green-600'
                                         }>
-                                            {totalStock} unit
+                                            {product.stockMode === 'SHARED_POOL'
+                                                ? `${totalStock} ${product.baseUnit?.abbreviation ?? 'unit'}`
+                                                : `${totalStock} unit`}
                                         </span>
                                     </div>
                                     <div className="flex gap-1 lg:gap-1.5">

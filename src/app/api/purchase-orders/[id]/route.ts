@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logCrudAudit } from "@/lib/audit";
+import { availableUnits } from "@/lib/stock-math";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                                 sku: true,
                                 price: true,
                                 stock: true,
-                                product: { select: { id: true, name: true } },
+                                conversionFactor: true,
+                                product: { select: { id: true, name: true, stockMode: true, sharedStock: true } },
                             },
                         },
                     },
@@ -39,7 +41,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
         }
 
-        return NextResponse.json(order);
+        // Shared-stock products: show how many of this selling unit the pool holds
+        return NextResponse.json({
+            ...order,
+            items: order.items.map(item => item.variant && item.variant.product.stockMode === 'SHARED_POOL'
+                ? { ...item, variant: { ...item.variant, stock: availableUnits(item.variant.product.sharedStock, item.variant.conversionFactor) } }
+                : item),
+        });
     } catch (error) {
         console.error("Error fetching purchase order:", error);
         return NextResponse.json({ error: "Failed to fetch purchase order" }, { status: 500 });

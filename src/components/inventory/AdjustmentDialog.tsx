@@ -66,11 +66,16 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
             return;
         }
 
+        const pooled = product.stockMode === "SHARED_POOL";
         setSelectedVariant({
             id: targetVariant.id,
-            name: product.name + (variant ? ` - ${variant.name}` : ""),
+            name: product.name + (variant ? ` - ${pooled ? (variant.unit?.name ?? "Unit") : (variant.name ?? "Default")}` : ""),
             sku: targetVariant.sku,
-            currentStock: targetVariant.stock
+            // Pooled products: stock is the shared pool, adjusted in this unit's size
+            pooled,
+            factor: targetVariant.conversionFactor ?? 1,
+            baseUnit: product.baseUnit?.abbreviation ?? "units",
+            currentStock: pooled ? product.sharedStock : targetVariant.stock
         });
         setSearch("");
         setProducts([]);
@@ -159,8 +164,17 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
                                                                 className="text-xs text-gray-600 p-1 hover:bg-blue-50 rounded flex justify-between"
                                                                 onClick={() => handleSelectProduct(product, v)}
                                                             >
-                                                                <span>{v.name || "Default"} ({v.sku})</span>
-                                                                <span>Stock: {v.stock}</span>
+                                                                {product.stockMode === "SHARED_POOL" ? (
+                                                                    <>
+                                                                        <span>{v.unit?.name ?? "Unit"} ({v.sku})</span>
+                                                                        <span>1 = {v.conversionFactor} {product.baseUnit?.abbreviation ?? "units"}</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span>{v.name || "Default"} ({v.sku})</span>
+                                                                        <span>Stock: {v.stock}</span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -181,7 +195,11 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
                             <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-md">
                                 <div>
                                     <div className="font-medium text-blue-900">{selectedVariant.name}</div>
-                                    <div className="text-xs text-blue-700">SKU: {selectedVariant.sku} • Current Stock: {selectedVariant.currentStock}</div>
+                                    <div className="text-xs text-blue-700">
+                                        SKU: {selectedVariant.sku} • {selectedVariant.pooled
+                                            ? `Shared stock: ${selectedVariant.currentStock} ${selectedVariant.baseUnit}`
+                                            : `Current Stock: ${selectedVariant.currentStock}`}
+                                    </div>
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={() => setSelectedVariant(null)} type="button">
                                     <X className="h-4 w-4" />
@@ -215,7 +233,11 @@ export function AdjustmentDialog({ onAdjustmentCreated }: AdjustmentDialogProps)
                                 value={quantity}
                                 onChange={(e) => setQuantity(e.target.value)}
                             />
-                            <p className="text-[10px] text-gray-500">Use negative for removal, positive for addition.</p>
+                            <p className="text-[10px] text-gray-500">
+                                {selectedVariant?.pooled && parseInt(quantity)
+                                    ? `= ${parseInt(quantity) * selectedVariant.factor} ${selectedVariant.baseUnit} in the shared stock`
+                                    : "Use negative for removal, positive for addition."}
+                            </p>
                         </div>
                     </div>
 

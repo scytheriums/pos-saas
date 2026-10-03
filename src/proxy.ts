@@ -38,7 +38,10 @@ const PUBLIC_PATHS = [
     '/api/debug',
     '/',
     '/privacy',
-    '/test-env'
+    '/test-env',
+    // PWA: browsers fetch the manifest without cookies, and the service worker caches the offline page
+    '/manifest.json',
+    '/offline',
 ];
 
 function isPublicPath(pathname: string): boolean {

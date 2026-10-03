@@ -71,20 +71,24 @@ export async function PATCH(
                     id: params.id,
                     tenantId
                 }
-            }
+            },
+            include: { product: { select: { stockMode: true } } }
         });
 
         if (!variant) {
             return NextResponse.json({ error: 'Variant not found' }, { status: 404 });
         }
 
+        // Shared-pool variants take stock and cost from the product's pool
+        const pooled = variant.product.stockMode === 'SHARED_POOL';
+
         const updatedVariant = await prisma.productVariant.update({
             where: { id: params.variantId },
             data: {
                 sku,
                 price: new Prisma.Decimal(price),
-                cost: cost !== undefined ? new Prisma.Decimal(cost) : undefined,
-                stock,
+                cost: cost !== undefined && !pooled ? new Prisma.Decimal(cost) : undefined,
+                stock: pooled ? undefined : stock,
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined
             }
         });

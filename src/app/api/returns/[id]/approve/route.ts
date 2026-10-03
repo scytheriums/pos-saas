@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { NON_RESTOCKABLE_REASONS } from "@/lib/returns";
+import { putStock } from "@/lib/stock";
 
 class ReturnAlreadyProcessedError extends Error {}
 
@@ -82,12 +83,8 @@ export async function PATCH(
 
             for (const item of approved.items) {
                 if (restock && !item.restocked) {
-                    await tx.productVariant.update({
-                        where: { id: item.variantId },
-                        data: {
-                            stock: { increment: item.quantity }
-                        }
-                    });
+                    // Back to the variant, or quantity × size into the product's shared pool
+                    const moved = await putStock(tx, item.variantId, item.quantity);
 
                     await tx.returnItem.update({
                         where: { id: item.id },
@@ -105,6 +102,7 @@ export async function PATCH(
                             reason: "RETURN",
                             returnId: id,
                             quantity: item.quantity,
+                            ...(moved.pooled ? { baseQuantity: moved.baseQuantity } : {}),
                             type: "INCREMENT",
                             productName: item.variant.product.name
                         },

@@ -18,6 +18,9 @@ type Variant = {
     stock: number;
     optionValues: any[];
     imageUrl?: string | null;
+    /** Shared-stock products: the selling unit and its size in base units */
+    unit?: { name: string; abbreviation: string } | null;
+    conversionFactor?: number;
 };
 
 interface VariantSelectorProps {
@@ -28,6 +31,8 @@ interface VariantSelectorProps {
         name: string;
         options: Option[];
         variants: Variant[];
+        stockMode?: string;
+        baseUnit?: { abbreviation: string } | null;
     } | null;
     onAddToCart: (variant: Variant) => void;
 }
@@ -36,14 +41,39 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
-    // Early return if product is null
+    // Check if product has options with values
+    const hasOptions = !!product && product.options && product.options.length > 0 &&
+        product.options.every(opt => opt.values && opt.values.length > 0);
+
+    // Auto-select first variant when dialog opens (hooks must run before any early return)
+    useEffect(() => {
+        if (open && product) {
+            if (hasOptions) {
+                // Auto-select first value for each option
+                const initialOptions: Record<string, string> = {};
+                product.options.forEach(option => {
+                    if (option.values && option.values.length > 0) {
+                        initialOptions[option.id] = option.values[0].id;
+                    }
+                });
+                setSelectedOptions(initialOptions);
+            } else if (product.variants && product.variants.length > 0) {
+                // Auto-select first variant for direct selection
+                setSelectedVariantId(product.variants[0].id);
+            }
+        } else if (!open) {
+            // Reset when dialog closes
+            setSelectedOptions({});
+            setSelectedVariantId(null);
+        }
+    }, [open, product, hasOptions]);
+
     if (!product) {
         return null;
     }
-
-    // Check if product has options with values
-    const hasOptions = product.options && product.options.length > 0 &&
-        product.options.every(opt => opt.values && opt.values.length > 0);
+    // Pack sizes drawing on one shared stock count (stock per size is what the pool can supply)
+    const pooled = product.stockMode === 'SHARED_POOL';
+    const baseAbbr = product.baseUnit?.abbreviation ?? 'units';
 
     const handleSelect = (optionId: string, valueId: string) => {
         setSelectedOptions((prev) => ({ ...prev, [optionId]: valueId }));
@@ -71,29 +101,6 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
 
     const selectedVariant = getSelectedVariant();
 
-    // Auto-select first variant when dialog opens
-    useEffect(() => {
-        if (open && product) {
-            if (hasOptions) {
-                // Auto-select first value for each option
-                const initialOptions: Record<string, string> = {};
-                product.options.forEach(option => {
-                    if (option.values && option.values.length > 0) {
-                        initialOptions[option.id] = option.values[0].id;
-                    }
-                });
-                setSelectedOptions(initialOptions);
-            } else if (product.variants && product.variants.length > 0) {
-                // Auto-select first variant for direct selection
-                setSelectedVariantId(product.variants[0].id);
-            }
-        } else if (!open) {
-            // Reset when dialog closes
-            setSelectedOptions({});
-            setSelectedVariantId(null);
-        }
-    }, [open, product, hasOptions]);
-
     const handleConfirm = () => {
         if (selectedVariant) {
             onAddToCart(selectedVariant);
@@ -105,9 +112,9 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Select Options for {product.name}</DialogTitle>
+                    <DialogTitle>{pooled ? `Choose a size of ${product.name}` : `Select Options for ${product.name}`}</DialogTitle>
                     <DialogDescription>
-                        Choose your preferred options for this product
+                        {pooled ? 'All sizes share one stock count' : 'Choose your preferred options for this product'}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -133,16 +140,26 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
                     ) : (
                         // Direct variant selection (fallback for products without option values)
                         <div className="space-y-2">
-                            <h4 className="font-medium text-sm">Select Variant</h4>
+                            <h4 className="font-medium text-sm">{pooled ? 'Size' : 'Select Variant'}</h4>
                             <div className="space-y-2">
                                 {product.variants.map((variant) => (
                                     <Button
                                         key={variant.id}
                                         variant={selectedVariantId === variant.id ? "default" : "outline"}
-                                        className="w-full justify-between"
+                                        className="w-full justify-between h-auto py-2"
                                         onClick={() => setSelectedVariantId(variant.id)}
+                                        disabled={pooled && variant.stock <= 0}
                                     >
-                                        <span>{variant.sku}</span>
+                                        {pooled ? (
+                                            <span className="text-left">
+                                                <span className="block">{variant.unit?.name ?? variant.sku}</span>
+                                                <span className="block text-[11px] opacity-70">
+                                                    {variant.conversionFactor ?? 1} {baseAbbr} · {variant.stock} available
+                                                </span>
+                                            </span>
+                                        ) : (
+                                            <span>{variant.sku}</span>
+                                        )}
                                         <span>{formatCurrency(variant.price)}</span>
                                     </Button>
                                 ))}
@@ -173,7 +190,9 @@ export function VariantSelector({ open, onClose, product, onAddToCart }: Variant
                                 <div className="flex justify-between items-center mt-2 text-sm">
                                     <span className="text-muted-foreground">Stock:</span>
                                     <span className={selectedVariant.stock > 0 ? "text-green-600" : "text-red-600"}>
-                                        {selectedVariant.stock} units
+                                        {pooled
+                                            ? `${selectedVariant.stock} ${selectedVariant.unit?.name ?? 'units'} available`
+                                            : `${selectedVariant.stock} units`}
                                     </span>
                                 </div>
                                 <div className="mt-1 text-xs text-gray-500">

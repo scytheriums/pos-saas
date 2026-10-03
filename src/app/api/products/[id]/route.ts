@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma, StockMode } from '@prisma/client';
 import { getAuthUser, requirePermission } from '@/lib/auth';
 import { logCrudAudit } from '@/lib/audit';
+import { withAvailableStock } from '@/lib/stock';
+import { parsePoolSettings, variantPoolFields, PoolSettings, PoolValidationError } from '@/lib/product-pool';
 
 export async function GET(
     req: NextRequest,
@@ -24,8 +26,10 @@ export async function GET(
                 tenantId
             },
             include: {
+                baseUnit: { select: { id: true, name: true, abbreviation: true } },
                 variants: {
                     include: {
+                        unit: { select: { id: true, name: true, abbreviation: true } },
                         optionValues: {
                             include: {
                                 option: true
@@ -45,7 +49,7 @@ export async function GET(
             return NextResponse.json({ error: 'Product not found' }, { status: 404 });
         }
 
-        return NextResponse.json(product);
+        return NextResponse.json(withAvailableStock(product));
     } catch (error) {
         console.error('Error fetching product:', error);
         return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 });
@@ -66,6 +70,9 @@ interface IncomingVariant {
     cost?: number;
     stock: number;
     imageUrl?: string | null;
+    /** Shared-pool products: the selling unit and how many base units it holds */
+    unitId?: string | null;
+    conversionFactor?: number;
 }
 
 class ProductSyncError extends Error {
@@ -87,9 +94,11 @@ async function syncOptionsAndVariants(
         productName: string;
         options: IncomingOption[];
         variants: IncomingVariant[];
+        pool: PoolSettings;
     }
 ) {
-    const { productId, tenantId, productName, options, variants } = params;
+    const { productId, tenantId, productName, options, variants, pool } = params;
+    const pooled = pool.stockMode === StockMode.SHARED_POOL;
 
     const existingOptions = await tx.productOption.findMany({
         where: { productId },
@@ -187,7 +196,8 @@ async function syncOptionsAndVariants(
     for (const variant of variants) {
         const price = Number(variant.price);
         const cost = Number(variant.cost ?? 0);
-        const stock = Number(variant.stock);
+        // Pooled variants hold no stock of their own (the pool is on the product)
+        const stock = pooled ? 0 : Number(variant.stock);
         if (!Number.isFinite(price) || price < 0) throw new ProductSyncError('Variant price must be zero or more');
         if (!Number.isFinite(cost) || cost < 0) throw new ProductSyncError('Variant cost must be zero or more');
         if (!Number.isInteger(stock) || stock < 0) throw new ProductSyncError('Variant stock must be a whole number, zero or more');
@@ -210,7 +220,8 @@ async function syncOptionsAndVariants(
                     cost: new Prisma.Decimal(cost),
                     stock,
                     imageUrl: variant.imageUrl ?? null,
-                    optionValues: { set: optionValueIds.map(id => ({ id })) }
+                    optionValues: { set: optionValueIds.map(id => ({ id })) },
+                    ...variantPoolFields(pool, variant),
                 }
             });
             continue;
@@ -237,7 +248,8 @@ async function syncOptionsAndVariants(
                 cost: new Prisma.Decimal(cost),
                 stock,
                 imageUrl: variant.imageUrl || null,
-                optionValues: { connect: optionValueIds.map(id => ({ id })) }
+                optionValues: { connect: optionValueIds.map(id => ({ id })) },
+                ...variantPoolFields(pool, variant),
             }
         });
         added++;
@@ -289,6 +301,17 @@ export async function PATCH(
             return NextResponse.json({ error: 'Product not found' }, { status: 404 });
         }
 
+        // Stock mode only changes together with the full variant list (the edit form)
+        const pool = syncVariants
+            ? await parsePoolSettings(prisma, tenantId, body, variants, {
+                stockMode: existingProduct.stockMode,
+                baseUnitId: existingProduct.baseUnitId,
+                sharedStock: existingProduct.sharedStock,
+                poolCost: Number(existingProduct.poolCost),
+            })
+            : null;
+        const pooled = pool?.stockMode === StockMode.SHARED_POOL;
+
         const { updatedProduct, variantChanges } = await prisma.$transaction(async (tx) => {
             const updatedProduct = await tx.product.update({
                 where: { id },
@@ -301,18 +324,26 @@ export async function PATCH(
                     supplierId: supplierId !== undefined ? (supplierId || null) : undefined,
                     isSellable: isSellable !== undefined ? isSellable : undefined,
                     isPurchasable: isPurchasable !== undefined ? isPurchasable : undefined,
+                    ...(pool ? {
+                        stockMode: pool.stockMode,
+                        sharedStock: pool.sharedStock,
+                        poolCost: new Prisma.Decimal(pool.poolCost),
+                        baseUnitId: pool.baseUnitId,
+                    } : {}),
                 }
             });
 
-            const variantChanges = syncVariants
+            const variantChanges = syncVariants && pool
                 ? await syncOptionsAndVariants(tx, {
                     productId: id,
                     tenantId,
                     productName: updatedProduct.name,
-                    options: hasVariants && Array.isArray(options) ? options : [],
-                    variants: hasVariants
+                    // Pooled products have selling units instead of options
+                    options: hasVariants && !pooled && Array.isArray(options) ? options : [],
+                    variants: hasVariants && !pooled
                         ? variants
                         : variants.map((v: IncomingVariant) => ({ ...v, optionValueIds: [] })),
+                    pool,
                 })
                 : null;
 
@@ -359,7 +390,7 @@ export async function PATCH(
 
         return NextResponse.json(result);
     } catch (error) {
-        if (error instanceof ProductSyncError) {
+        if (error instanceof ProductSyncError || error instanceof PoolValidationError) {
             return NextResponse.json({ error: error.message }, { status: error.status });
         }
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

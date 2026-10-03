@@ -26,6 +26,7 @@ import {
     Receipt,
     Star,
     Barcode,
+    Ruler,
     Truck,
     ShoppingBag,
 } from "lucide-react";
@@ -93,6 +94,7 @@ const MORE_SECTIONS = [
             { icon: Settings, label: "POS", href: "/dashboard/settings/pos" },
             { icon: Globe, label: "Localization", href: "/dashboard/settings/localization" },
             { icon: Barcode, label: "SKU", href: "/dashboard/settings/sku" },
+            { icon: Ruler, label: "Units", href: "/dashboard/settings/units" },
             { icon: BarChart3, label: "Audit Log", href: "/dashboard/audit-logs" },
         ],
     },

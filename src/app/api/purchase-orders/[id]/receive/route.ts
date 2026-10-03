@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ExpenseCategory } from "@prisma/client";
+import { ExpenseCategory, Prisma } from "@prisma/client";
+import { putStock, syncPoolVariantCosts } from "@/lib/stock";
 import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logCrudAudit } from "@/lib/audit";
 
@@ -68,14 +69,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 // Only increment stock for linked product variants
                 if (poItem.variantId && incoming.receivedQuantity > 0) {
-                    await tx.productVariant.update({
-                        where: { id: poItem.variantId },
-                        data: {
-                            stock: { increment: incoming.receivedQuantity },
-                            // Update the variant cost to latest PO unit cost if requested
-                            ...(poItem.updateVariantCost ? { cost: poItem.unitCost } : {}),
-                        },
-                    });
+                    // Into the variant, or quantity × size into the product's shared pool
+                    const moved = await putStock(tx, poItem.variantId, incoming.receivedQuantity);
+
+                    // Update cost to the latest PO unit cost if requested
+                    if (poItem.updateVariantCost) {
+                        if (moved.pooled) {
+                            // The PO price is per selling unit; the pool is costed per base unit
+                            const variant = await tx.productVariant.findUniqueOrThrow({
+                                where: { id: poItem.variantId },
+                                select: { conversionFactor: true, productId: true },
+                            });
+                            await tx.product.update({
+                                where: { id: variant.productId },
+                                data: { poolCost: new Prisma.Decimal(Number(poItem.unitCost) / variant.conversionFactor) },
+                            });
+                            await syncPoolVariantCosts(tx, variant.productId);
+                        } else {
+                            await tx.productVariant.update({
+                                where: { id: poItem.variantId },
+                                data: { cost: poItem.unitCost },
+                            });
+                        }
+                    }
                 }
             }
 

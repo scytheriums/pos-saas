@@ -3,6 +3,7 @@ import { auth } from '@/lib/better-auth';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
 import { createDefaultRoles } from '@/lib/permissions';
+import { createDefaultUnits } from '@/lib/units';
 
 export async function POST(req: NextRequest) {
     try {
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
 
         // Create default RBAC roles for the new tenant
         await createDefaultRoles(result.id);
+        await createDefaultUnits(result.id);
         const ownerRole = await prisma.userRole.findFirst({
             where: { tenantId: result.id, isDefault: true },
         });

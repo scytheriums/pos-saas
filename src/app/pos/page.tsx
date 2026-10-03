@@ -286,9 +286,10 @@ export default function POSPage() {
             price: variant ? variant.price : product.price,
             quantity: 1,
             variantId: variant?.id,
+            // Option values (Size M / Black), or the selling unit for shared-stock products (Tray)
             variantName: variant?.optionValues?.length
                 ? variant.optionValues.map((ov: any) => ov.value).join(' / ')
-                : undefined,
+                : variant?.unit?.name ?? undefined,
         };
 
         setCart((prev) => {

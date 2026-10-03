@@ -29,6 +29,7 @@ import {
     ShoppingBag,
     Boxes,
     Wallet,
+    Ruler,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -116,6 +117,7 @@ export function Sidebar() {
                 { label: "Receipt Settings", href: "/dashboard/settings/receipt", icon: FileText },
                 { label: "POS Settings", href: "/dashboard/settings/pos", icon: Settings },
                 { label: "SKU Settings", href: "/dashboard/settings/sku", icon: Settings },
+                { label: "Units of Measure", href: "/dashboard/settings/units", icon: Ruler },
                 { label: "Localization", href: "/dashboard/settings/localization", icon: Globe },
                 { label: "Audit Log", href: "/dashboard/audit-logs", icon: BarChart3 },
             ],

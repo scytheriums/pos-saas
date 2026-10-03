@@ -16,10 +16,12 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const threshold = parseInt(searchParams.get('threshold') || '10');
 
+        // Per-variant stock (shared-stock products' variants hold no stock of their own; checked below)
         const lowStockVariants = await prisma.productVariant.findMany({
             where: {
                 product: {
-                    tenantId
+                    tenantId,
+                    stockMode: 'PER_VARIANT'
                 },
                 stock: {
                     lte: threshold
@@ -41,14 +43,36 @@ export async function GET(req: NextRequest) {
             }
         });
 
-        const formattedResults = lowStockVariants.map(variant => ({
-            id: variant.id,
-            productName: variant.product.name,
-            sku: variant.sku,
-            currentStock: variant.stock,
-            minStock: variant.product.minStock,
-            urgency: variant.stock === 0 ? 'critical' : variant.stock <= variant.product.minStock / 2 ? 'high' : 'medium'
-        }));
+        // Shared stock pools: compared with the product's minimum, both in base units
+        const pools = await prisma.product.findMany({
+            where: { tenantId, stockMode: 'SHARED_POOL' },
+            select: { id: true, name: true, minStock: true, sharedStock: true, baseUnit: { select: { abbreviation: true } } },
+        });
+        const lowPools = pools.filter(p => p.sharedStock <= p.minStock);
+
+        const urgency = (stock: number, min: number) =>
+            stock <= 0 ? 'critical' : stock <= min / 2 ? 'high' : 'medium';
+
+        const formattedResults = [
+            ...lowStockVariants.map(variant => ({
+                id: variant.id,
+                productName: variant.product.name,
+                sku: variant.sku,
+                currentStock: variant.stock,
+                unit: null as string | null,
+                minStock: variant.product.minStock,
+                urgency: urgency(variant.stock, variant.product.minStock)
+            })),
+            ...lowPools.map(p => ({
+                id: p.id,
+                productName: p.name,
+                sku: 'Shared stock',
+                currentStock: p.sharedStock,
+                unit: p.baseUnit?.abbreviation ?? null,
+                minStock: p.minStock,
+                urgency: urgency(p.sharedStock, p.minStock)
+            })),
+        ].sort((a, b) => a.currentStock - b.currentStock);
 
         return NextResponse.json({
             threshold,

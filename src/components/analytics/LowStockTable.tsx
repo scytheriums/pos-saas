@@ -10,6 +10,8 @@ interface LowStockItem {
     productName: string;
     sku: string;
     currentStock: number;
+    /** Base unit for shared-stock products */
+    unit?: string | null;
     minStock: number;
     urgency: string;
 }
@@ -51,7 +53,7 @@ export function LowStockTable({ items, threshold }: LowStockTableProps) {
                                         <TableCell className="font-mono text-sm hidden sm:table-cell">{item.sku}</TableCell>
                                         <TableCell className="text-right">
                                             <span className={item.currentStock === 0 ? 'text-red-600 font-bold' : ''}>
-                                                {item.currentStock}
+                                                {item.currentStock}{item.unit ? ` ${item.unit}` : ''}
                                             </span>
                                         </TableCell>
                                         <TableCell>

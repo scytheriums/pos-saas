@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, StockMode } from "@prisma/client";
 import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logCrudAudit } from "@/lib/audit";
+import { withAvailableStock } from "@/lib/stock";
+import { parsePoolSettings, variantPoolFields, PoolValidationError } from "@/lib/product-pool";
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,6 +33,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Product name is required" }, { status: 400 });
         }
 
+        // Shared stock pool: one stock count in the base unit, variants are pack sizes of it
+        const pool = await parsePoolSettings(prisma, tenantId, body, Array.isArray(variants) ? variants : []);
+
         const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // Fetch tenant settings for SKU generation
             const tenant = await tx.tenant.findUnique({
@@ -55,12 +60,49 @@ export async function POST(req: NextRequest) {
                     isSellable: isSellable !== undefined ? isSellable : true,
                     isPurchasable: isPurchasable !== undefined ? isPurchasable : true,
                     tenantId,
+                    stockMode: pool.stockMode,
+                    sharedStock: pool.sharedStock,
+                    poolCost: new Prisma.Decimal(pool.poolCost),
+                    baseUnitId: pool.baseUnitId,
                 },
             });
 
             console.log('Base product created:', product.id);
 
-            if (!hasVariants) {
+            if (pool.stockMode === StockMode.SHARED_POOL) {
+                // Selling units: no options, each variant is a pack size of the pool
+                const { generateSKU } = await import('@/lib/sku-generator');
+                let generated = 0;
+                for (const variant of variants as { sku?: string; price: number; unitId: string; conversionFactor: number; imageUrl?: string | null }[]) {
+                    let sku = variant.sku?.trim() ?? '';
+                    if (!sku) {
+                        if (!tenant?.autoGenerateSku) throw new PoolValidationError('Every selling unit needs a SKU');
+                        sku = generateSKU({
+                            businessName: tenant.name,
+                            counter: tenant.skuCounter + generated,
+                            format: tenant.skuFormat,
+                            prefix: tenant.skuPrefix || undefined,
+                            productName: name
+                        });
+                        generated++;
+                    }
+                    await tx.productVariant.create({
+                        data: {
+                            productId: product.id,
+                            sku,
+                            price: new Prisma.Decimal(Number(variant.price) || 0),
+                            imageUrl: variant.imageUrl || null,
+                            ...variantPoolFields(pool, variant),
+                        },
+                    });
+                }
+                if (generated > 0) {
+                    await tx.tenant.update({
+                        where: { id: tenantId },
+                        data: { skuCounter: { increment: generated } }
+                    });
+                }
+            } else if (!hasVariants) {
                 // Create a single default variant for simple products
                 if (!variants || variants.length === 0) {
                     throw new Error("Simple product must have at least one variant definition");
@@ -277,13 +319,14 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(result, { status: 201 });
     } catch (error) {
+        if (error instanceof PoolValidationError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return NextResponse.json({ error: "One of the SKUs is already used by another product variant" }, { status: 409 });
+        }
         console.error("Error creating product:", error);
-        // Return more detailed error for debugging
-        return NextResponse.json({
-            error: "Failed to create product",
-            details: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined
-        }, { status: 500 });
+        return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
     }
 }
 
@@ -353,6 +396,9 @@ export async function GET(req: NextRequest) {
                 isSellable: true,
                 isPurchasable: true,
                 createdAt: true,
+                stockMode: true,
+                sharedStock: true,
+                baseUnit: { select: { id: true, name: true, abbreviation: true } },
                 options: {
                     select: {
                         id: true,
@@ -373,6 +419,8 @@ export async function GET(req: NextRequest) {
                         price: true,
                         stock: true,
                         imageUrl: true,
+                        conversionFactor: true,
+                        unit: { select: { id: true, name: true, abbreviation: true } },
                         optionValues: {
                             select: {
                                 id: true,
@@ -393,8 +441,10 @@ export async function GET(req: NextRequest) {
         });
 
         const hasMore = products.length > limit;
-        const data = hasMore ? products.slice(0, limit) : products;
-        const nextCursor = hasMore ? data[data.length - 1].id : null;
+        const page = hasMore ? products.slice(0, limit) : products;
+        const nextCursor = hasMore ? page[page.length - 1].id : null;
+        // Pooled products: each variant's stock is what the shared pool can supply
+        const data = page.map(withAvailableStock);
 
         return NextResponse.json({ products: data, nextCursor, hasMore });
     } catch (error) {

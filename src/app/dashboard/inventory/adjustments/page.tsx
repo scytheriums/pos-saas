@@ -11,6 +11,15 @@ import { formatDateTimeWithSettings } from "@/lib/format";
 import { useTenantSettings } from "@/contexts/SettingsContext";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
+/** "+10", or for shared-stock products "-3 Tray (-90 pcs)" */
+function formatAdjustment(adj: { quantity: number; baseQuantity?: number | null; variant: { unit?: { name: string } | null; product: { baseUnit?: { abbreviation: string } | null } } }) {
+    const sign = (n: number) => (n > 0 ? "+" : "");
+    if (adj.baseQuantity == null) return `${sign(adj.quantity)}${adj.quantity}`;
+    const unit = adj.variant.unit?.name ? ` ${adj.variant.unit.name}` : "";
+    const base = adj.variant.product.baseUnit?.abbreviation ? ` ${adj.variant.product.baseUnit.abbreviation}` : "";
+    return `${sign(adj.quantity)}${adj.quantity}${unit} (${sign(adj.baseQuantity)}${adj.baseQuantity}${base})`;
+}
+
 export default function StockAdjustmentsPage() {
     const settings = useTenantSettings();
     const [adjustments, setAdjustments] = useState<any[]>([]);
@@ -74,7 +83,7 @@ export default function StockAdjustmentsPage() {
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-sm">{adj.variant.product.name}</span>
                                     <span className={`font-bold text-sm ${adj.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
-                                        {adj.quantity > 0 ? "+" : ""}{adj.quantity}
+                                        {formatAdjustment(adj)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -140,7 +149,7 @@ export default function StockAdjustmentsPage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className={`text-right font-bold ${adj.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
-                                                {adj.quantity > 0 ? "+" : ""}{adj.quantity}
+                                                {formatAdjustment(adj)}
                                             </TableCell>
                                             <TableCell>{adj.userId}</TableCell>
                                             <TableCell className="max-w-[200px] truncate" title={adj.notes || ""}>

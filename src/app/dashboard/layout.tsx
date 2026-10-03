@@ -18,7 +18,9 @@ export default function DashboardLayout({
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                 {/* Top bar: mobile/tablet only */}
                 <MobileDashboardHeader />
-                <main className="flex-1 overflow-y-auto bg-muted/10 print:w-full print:bg-white print:overflow-visible pb-16 lg:pb-0">
+                {/* relative: absolutely positioned helpers (e.g. Radix Select's hidden <select>) stay inside
+                    the scroll area instead of stretching the page below it */}
+                <main className="relative flex-1 overflow-y-auto bg-muted/10 print:w-full print:bg-white print:overflow-visible pb-16 lg:pb-0">
                     <div className="container mx-auto p-4 lg:p-6 print:p-0 print:w-full print:max-w-none">
                         <ErrorBoundary context="dashboard">
                             <PageGuard>{children}</PageGuard>
