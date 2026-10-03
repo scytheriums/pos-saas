@@ -35,6 +35,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useState, useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/hooks/usePermissions";
+import { canAccessPath } from "@/lib/page-access";
 
 type MenuItem = {
     icon: any;
@@ -51,7 +53,9 @@ export function Sidebar() {
     const [isSecondaryCollapsed, setIsSecondaryCollapsed] = useState(false);
     const [isTransitioning, setIsTransitioning] = useState(false);
 
-    const menuItems: MenuItem[] = [
+    const permissions = usePermissions();
+
+    const allMenuItems: MenuItem[] = [
         { icon: LayoutDashboard, label: t.sidebar.dashboard, href: "/dashboard/analytics" },
         { icon: ShoppingCart, label: t.sidebar.pos, href: "/pos" },
         {
@@ -117,6 +121,13 @@ export function Sidebar() {
             ],
         },
     ];
+
+    // Hide what this user's role can't open (groups disappear when all their pages are hidden)
+    const menuItems = allMenuItems
+        .map(item => item.children
+            ? { ...item, children: item.children.filter(child => canAccessPath(child.href, permissions)) }
+            : item)
+        .filter(item => item.children ? item.children.length > 0 : canAccessPath(item.href!, permissions));
 
     // Auto-select module based on current path
     useEffect(() => {

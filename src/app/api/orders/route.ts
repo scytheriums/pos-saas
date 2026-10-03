@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
-import { getAuthUser } from "@/lib/auth";
+import { Prisma, PaymentMethod } from "@prisma/client";
+import { calculateOrderTotals, lineDiscount } from "@/lib/order-totals";
+import { netPaymentEntries } from "@/lib/shift-cash";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logCrudAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -11,6 +13,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ORDERS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         // Parse query parameters
@@ -109,6 +113,20 @@ export async function GET(req: NextRequest) {
     }
 }
 
+/** A checkout the server refuses, with a message the cashier can act on. Never 409: offline sync treats 409 as "already synced". */
+class CheckoutError extends Error {
+    constructor(message: string, public status: number = 422, public extra: Record<string, unknown> = {}) {
+        super(message);
+    }
+}
+
+interface IncomingItem {
+    id?: string;
+    variantId?: string;
+    quantity: number;
+    itemDiscount?: number;
+}
+
 export async function POST(req: NextRequest) {
     try {
         // Get authenticated user and tenant
@@ -116,13 +134,20 @@ export async function POST(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'CREATE', 'ORDERS');
+        if (denied) return denied;
         const { tenantId, name: cashierName } = authResult.user;
 
         const body = await req.json();
-        const { items, total, paymentMethod, cashTendered, change, customerName, customerId, discountId, discountAmount, paymentEntries, shiftId, redeemPoints, offlineClientId, clientLastModifiedAt } = body;
+        const { items, total, paymentMethod, cashTendered, customerName, customerId, discountId, discountAmount, paymentEntries, shiftId, redeemPoints, offlineClientId, clientLastModifiedAt } = body;
 
-        if (!items || items.length === 0) {
+        if (!Array.isArray(items) || items.length === 0) {
             return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+        }
+        for (const item of items as IncomingItem[]) {
+            if (!(item.variantId || item.id) || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
+                return NextResponse.json({ error: "Each cart line needs a product and a quantity of at least 1" }, { status: 400 });
+            }
         }
 
         // Server-wins deduplication: if this offline order was already synced, return the existing order
@@ -131,7 +156,7 @@ export async function POST(req: NextRequest) {
                 where: { offlineClientId },
                 include: { items: true, paymentEntries: true },
             });
-            if (existing) {
+            if (existing && existing.tenantId === tenantId) {
                 // Order already on server — if server's lastModifiedAt >= client's, server wins (return as-is)
                 const serverMs = existing.lastModifiedAt.getTime();
                 const clientMs = clientLastModifiedAt ? Number(clientLastModifiedAt) : 0;
@@ -143,39 +168,41 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Validate payment entries if provided
-        if (paymentEntries && paymentEntries.length > 0) {
-            const entriesTotal = paymentEntries.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-            if (entriesTotal < Number(total)) {
-                return NextResponse.json({ error: "Payment entries do not cover the total" }, { status: 400 });
-            }
-        }
+        // Offline sales already happened at the till: record what the customer paid, but flag differences
+        const isOfflineSync = !!offlineClientId;
 
         const result = await prisma.$transaction(async (tx) => {
             // 0. Load tenant settings
             const tenantSettings = await tx.tenant.findUnique({
                 where: { id: tenantId },
                 select: {
+                    taxRate: true,
                     pointsPerCurrency: true,
                     pointRedemptionRate: true,
                     minimumRedeemPoints: true,
                     enableStockManagement: true,
                 },
             });
+            const taxRatePercent = Number(tenantSettings?.taxRate ?? 0);
             const pointsPerCurrency = Number(tenantSettings?.pointsPerCurrency ?? 0);
             const pointRedemptionRate = Number(tenantSettings?.pointRedemptionRate ?? 0);
             const minimumRedeemPoints = Number(tenantSettings?.minimumRedeemPoints ?? 0);
             const stockEnabled = tenantSettings?.enableStockManagement !== false;
 
-            // 1. Validate Stock Availability and fetch variant data
+            // 1. Load variants (this tenant only) and check stock per variant across all cart lines
+            const qtyByVariant = new Map<string, number>();
+            for (const item of items as IncomingItem[]) {
+                const variantId = (item.variantId || item.id)!;
+                qtyByVariant.set(variantId, (qtyByVariant.get(variantId) ?? 0) + Number(item.quantity));
+            }
+
             const stockWarnings: string[] = [];
             const stockErrors: string[] = [];
             const variantDataMap = new Map<string, { price: number; cost: number }>();
 
-            for (const item of items) {
-                const variantId = item.variantId || item.id;
-                const variant = await tx.productVariant.findUnique({
-                    where: { id: variantId },
+            for (const [variantId, quantity] of qtyByVariant) {
+                const variant = await tx.productVariant.findFirst({
+                    where: { id: variantId, product: { tenantId } },
                     select: {
                         id: true,
                         stock: true,
@@ -192,21 +219,16 @@ export async function POST(req: NextRequest) {
                 });
 
                 if (!variant) {
-                    stockErrors.push(`Product variant ${variantId} not found`);
-                    continue;
+                    throw new CheckoutError("One of the products in the cart no longer exists. Remove it and try again.");
                 }
 
                 if (stockEnabled) {
-                    // Check if sufficient stock
-                    if (variant.stock < item.quantity) {
-                        stockErrors.push(
-                            `Insufficient stock for ${variant.product.name} (${variant.sku}). ` +
-                            `Available: ${variant.stock}, Requested: ${item.quantity}`
-                        );
+                    if (variant.stock < quantity) {
+                        stockErrors.push(`${variant.product.name} (${variant.sku}): ${variant.stock} in stock, ${quantity} in cart`);
                     }
 
                     // Warn if stock will go below minimum threshold
-                    const newStock = variant.stock - item.quantity;
+                    const newStock = variant.stock - quantity;
                     if (newStock < variant.product.minStock && newStock >= 0) {
                         stockWarnings.push(
                             `${variant.product.name} (${variant.sku}) will be low on stock after this order. ` +
@@ -215,58 +237,150 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                // Store variant data for order creation (price/cost snapshot always needed)
                 variantDataMap.set(variantId, {
                     price: Number(variant.price),
                     cost: Number(variant.cost)
                 });
             }
 
-            // If there are stock errors, abort transaction (only when stock management is on)
             if (stockErrors.length > 0) {
-                throw new Error(stockErrors.join('; '));
+                if (!isOfflineSync) {
+                    throw new CheckoutError(`Not enough stock: ${stockErrors.join('; ')}`);
+                }
+                // The goods already left the shop: record the sale and flag that stock was off
+                stockWarnings.push(`Sold offline with too little stock recorded: ${stockErrors.join('; ')}`);
             }
 
-            // 2. Create Order
-            // Derive legacy fields from paymentEntries when provided
-            const primaryMethod = paymentEntries?.length > 0 ? paymentEntries[0].method : paymentMethod;
+            // 2. Customer, discount, points and shift must all belong to this tenant and still be valid
+            let customer: { id: string; points: number } | null = null;
+            if (customerId) {
+                customer = await tx.customer.findFirst({ where: { id: customerId, tenantId }, select: { id: true, points: true } });
+                if (!customer) throw new CheckoutError("The selected customer was not found");
+            }
+
+            let discount: { id: string; name: string; type: 'PERCENTAGE' | 'FIXED_AMOUNT'; value: number; maxDiscount: number | null; minPurchase: number | null } | null = null;
+            if (discountId) {
+                const d = await tx.discount.findFirst({ where: { id: discountId, tenantId } });
+                const now = new Date();
+                if (!d || (!isOfflineSync && (!d.active || (d.startDate && now < d.startDate) || (d.endDate && now > d.endDate)))) {
+                    throw new CheckoutError("The applied discount is no longer valid. Remove it and try again.");
+                }
+                discount = {
+                    id: d.id,
+                    name: d.name,
+                    type: d.type,
+                    value: Number(d.value),
+                    maxDiscount: d.maxDiscount !== null ? Number(d.maxDiscount) : null,
+                    minPurchase: d.minPurchase !== null ? Number(d.minPurchase) : null,
+                };
+            }
+
+            const pointsRequested = Math.max(0, Math.floor(Number(redeemPoints) || 0));
+            if (pointsRequested > 0) {
+                if (!customer) throw new CheckoutError("Select a customer to redeem points");
+                if (pointRedemptionRate <= 0) throw new CheckoutError("Points redemption is turned off");
+                if (pointsRequested < minimumRedeemPoints) throw new CheckoutError(`At least ${minimumRedeemPoints} points are needed to redeem`);
+                if (pointsRequested > customer.points) throw new CheckoutError(`The customer only has ${customer.points} points`);
+            }
+
+            if (shiftId) {
+                const shift = await tx.shift.findFirst({ where: { id: shiftId, tenantId }, select: { status: true } });
+                if (!shift) throw new CheckoutError("The shift for this sale was not found");
+                if (!isOfflineSync && shift.status !== 'OPEN') {
+                    throw new CheckoutError("This shift has been closed. Open a new shift to keep selling.");
+                }
+            }
+
+            // 3. Totals from database prices and settings — never from the request
+            const lines = (items as IncomingItem[]).map(item => {
+                const variantId = (item.variantId || item.id)!;
+                return {
+                    variantId,
+                    price: variantDataMap.get(variantId)!.price,
+                    cost: variantDataMap.get(variantId)!.cost,
+                    quantity: Number(item.quantity),
+                    itemDiscount: Math.max(0, Number(item.itemDiscount) || 0),
+                };
+            });
+            const totals = calculateOrderTotals({
+                lines,
+                taxRatePercent,
+                discount,
+                pointsRedeemed: pointsRequested,
+                pointRedemptionRate,
+            });
+
+            if (discount && discount.minPurchase && totals.subtotal < discount.minPurchase && !isOfflineSync) {
+                throw new CheckoutError(`"${discount.name}" needs a minimum purchase of ${discount.minPurchase}`);
+            }
+
+            const clientTotal = Number(total);
+            const totalMismatch = Math.abs(totals.total - clientTotal) > 0.01;
+            if (totalMismatch && !isOfflineSync) {
+                throw new CheckoutError(
+                    "The total on screen is out of date (a price or discount changed). Refresh the POS and try again.",
+                    422,
+                    { expectedTotal: totals.total, receivedTotal: clientTotal }
+                );
+            }
+            // Offline: keep what was actually charged; online: the two are equal
+            const recordedTotal = isOfflineSync ? clientTotal : totals.total;
+
+            // 4. Payments must cover the total; cash handed over beyond it is change, not income
+            const givenEntries: { method: PaymentMethod; amount: number }[] = Array.isArray(paymentEntries) && paymentEntries.length > 0
+                ? paymentEntries.map((e: { method: PaymentMethod; amount: number }) => ({ method: e.method, amount: Number(e.amount) }))
+                : [{ method: (paymentMethod as PaymentMethod) || "CASH", amount: Number(cashTendered) || recordedTotal }];
+            const amountGiven = givenEntries.reduce((sum, e) => sum + e.amount, 0);
+            if (amountGiven + 0.005 < recordedTotal) {
+                throw new CheckoutError("Payments don't cover the total");
+            }
+            const keptEntries = netPaymentEntries(givenEntries, recordedTotal);
+            if (!keptEntries) {
+                throw new CheckoutError("Only cash can be overpaid. Card, e-wallet and transfer amounts can't be more than what's due.");
+            }
+            const cashGiven = givenEntries.filter(e => e.method === 'CASH').reduce((sum, e) => sum + e.amount, 0);
+            const changeGiven = Math.max(0, Math.round((amountGiven - recordedTotal) * 100) / 100);
+
+            // 5. Create Order
+            const primaryMethod = givenEntries[0].method;
+            const pointsEarned = customer && pointsPerCurrency > 0 ? Math.floor(recordedTotal * pointsPerCurrency) : 0;
+            const recordedDiscount = isOfflineSync ? Number(discountAmount) || 0 : totals.discountAmount;
+
             const order = await tx.order.create({
                 data: {
-                    total: new Prisma.Decimal(total),
+                    total: new Prisma.Decimal(recordedTotal),
+                    subtotal: new Prisma.Decimal(totals.subtotal),
+                    taxAmount: new Prisma.Decimal(totals.tax),
                     status: "COMPLETED",
                     tenantId,
                     paymentMethod: primaryMethod,
-                    cashTendered: cashTendered ? new Prisma.Decimal(cashTendered) : null,
-                    change: change ? new Prisma.Decimal(change) : null,
+                    cashTendered: cashGiven > 0 ? new Prisma.Decimal(cashGiven) : null,
+                    change: changeGiven > 0 ? new Prisma.Decimal(changeGiven) : null,
                     customerName: customerName,
                     cashierName: cashierName || "Unknown Cashier",
-                    customerId: customerId || null,
-                    discountId: discountId || null,
-                    discountAmount: discountAmount ? new Prisma.Decimal(discountAmount) : new Prisma.Decimal(0),
+                    customerId: customer?.id ?? null,
+                    discountId: discount?.id ?? null,
+                    discountAmount: new Prisma.Decimal(recordedDiscount),
+                    pointsRedeemed: totals.pointsUsed,
+                    pointsDiscount: new Prisma.Decimal(totals.pointsDiscount),
+                    pointsEarned,
                     shiftId: shiftId || null,
                     offlineClientId: offlineClientId || null,
                     items: {
-                        create: items.map((item: any) => {
-                            const variantId = item.variantId || item.id;
-                            const variantData = variantDataMap.get(variantId);
-                            return {
-                                variantId,
-                                quantity: item.quantity,
-                                price: new Prisma.Decimal(variantData?.price || item.price),
-                                cost: new Prisma.Decimal(variantData?.cost || 0),
-                                itemDiscount: new Prisma.Decimal(item.itemDiscount || 0),
-                            };
-                        })
+                        create: lines.map(line => ({
+                            variantId: line.variantId,
+                            quantity: line.quantity,
+                            price: new Prisma.Decimal(line.price),
+                            cost: new Prisma.Decimal(line.cost),
+                            itemDiscount: new Prisma.Decimal(lineDiscount(line)),
+                        }))
                     },
-                    // Create payment entries (split payments)
-                    paymentEntries: paymentEntries?.length > 0 ? {
-                        create: paymentEntries.map((e: any) => ({
+                    // Amount kept per method (cash net of change)
+                    paymentEntries: {
+                        create: keptEntries.map(e => ({
                             method: e.method,
                             amount: new Prisma.Decimal(e.amount),
                         }))
-                    } : {
-                        // Legacy single-method — still create an entry for consistency
-                        create: [{ method: primaryMethod, amount: new Prisma.Decimal(total) }]
                     }
                 },
                 include: {
@@ -275,46 +389,43 @@ export async function POST(req: NextRequest) {
                 }
             });
 
-            // 3. Update Stock (only when stock management is enabled)
+            // 6. Update Stock (only when stock management is enabled)
             if (stockEnabled) {
-                for (const item of items) {
-                    const variantId = item.variantId || item.id;
-                    if (!variantDataMap.has(variantId)) continue;
-                    await tx.productVariant.update({
-                        where: { id: variantId },
-                        data: {
-                            stock: {
-                                decrement: Math.floor(Number(item.quantity))
-                            }
-                        }
-                    });
-                }
-            }
-
-            // 4. Loyalty points — redeem and/or award
-            let pointsEarned = 0;
-            if (customerId) {
-                const customer = await tx.customer.findFirst({ where: { id: customerId, tenantId }, select: { points: true } });
-                if (customer) {
-                    // Redeem points
-                    const pointsToRedeem = redeemPoints && pointRedemptionRate > 0 && redeemPoints >= minimumRedeemPoints
-                        ? Math.min(Math.floor(redeemPoints), customer.points)
-                        : 0;
-
-                    // Award points for this purchase (based on grand total)
-                    pointsEarned = pointsPerCurrency > 0 ? Math.floor(Number(total) * pointsPerCurrency) : 0;
-
-                    const pointsDelta = pointsEarned - pointsToRedeem;
-                    if (pointsDelta !== 0) {
-                        await tx.customer.update({
-                            where: { id: customerId },
-                            data: { points: { increment: pointsDelta } },
+                for (const [variantId, quantity] of qtyByVariant) {
+                    if (isOfflineSync) {
+                        await tx.productVariant.update({
+                            where: { id: variantId },
+                            data: { stock: { decrement: quantity } }
                         });
+                        continue;
+                    }
+                    // Decrement only if the stock is still there: a sale at another till may have taken it
+                    // since the check above. Atomic in the database, so two sales can't both take the last unit.
+                    const taken = await tx.productVariant.updateMany({
+                        where: { id: variantId, stock: { gte: quantity } },
+                        data: { stock: { decrement: quantity } }
+                    });
+                    if (taken.count === 0) {
+                        throw new CheckoutError("Another sale just took the last of an item in this cart. Check stock and try again.");
                     }
                 }
             }
 
-            return { order, stockWarnings, pointsEarned };
+            // 7. Loyalty points — redeem and award
+            const pointsDelta = pointsEarned - totals.pointsUsed;
+            if (customer && pointsDelta !== 0) {
+                await tx.customer.update({
+                    where: { id: customer.id },
+                    data: { points: { increment: pointsDelta } },
+                });
+            }
+
+            return {
+                order,
+                stockWarnings,
+                pointsEarned,
+                totalMismatch: totalMismatch ? { expectedTotal: totals.total, recordedTotal } : null,
+            };
         }, {
             maxWait: 10000,  // 10s max wait for a connection
             timeout: 30000,  // 30s max for the transaction to complete
@@ -331,20 +442,22 @@ export async function POST(req: NextRequest) {
             after: {
                 total: Number(result.order.total),
                 itemsCount: result.order.items.length,
-                paymentMethod: result.order.paymentMethod
+                paymentMethod: result.order.paymentMethod,
+                // An offline sale whose total differs from current prices/discounts — worth reviewing
+                ...(result.totalMismatch ? { offlineTotalMismatch: result.totalMismatch } : {}),
             },
             request: req
         });
 
-        return NextResponse.json(result, { status: 201 });
+        return NextResponse.json(
+            { order: result.order, stockWarnings: result.stockWarnings, pointsEarned: result.pointsEarned },
+            { status: 201 }
+        );
     } catch (error) {
-        console.error("Error creating order:", error);
-        if (error instanceof Error) {
-            console.error("Error name:", error.name);
-            console.error("Error message:", error.message);
-            console.error("Error cause:", (error as any).code, (error as any).meta);
+        if (error instanceof CheckoutError) {
+            return NextResponse.json({ error: error.message, ...error.extra }, { status: error.status });
         }
-        const msg = error instanceof Error ? error.message : String(error);
-        return NextResponse.json({ error: "Failed to create order", details: msg }, { status: 500 });
+        console.error("Error creating order:", error);
+        return NextResponse.json({ error: "Checkout failed because of a server error. Try again." }, { status: 500 });
     }
 }

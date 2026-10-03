@@ -1,5 +1,19 @@
 // Service Worker for PWA offline capability
-const CACHE_NAME = 'awan-pos-v2';
+const CACHE_NAME = 'awan-pos-v3';
+
+// Pages and API reads the POS needs to start offline: network first, last good copy as fallback
+const OFFLINE_PAGES = ['/pos'];
+const OFFLINE_API_READS = ['/api/tenant/me', '/api/settings/tenant', '/api/me/permissions', '/api/shifts'];
+
+function networkFirstWithCache(request) {
+    return fetch(request).then((response) => {
+        if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+    }).catch(() => caches.match(request).then((cached) => cached || Promise.reject(new Error('offline'))));
+}
 const OFFLINE_URL = '/offline';
 
 // Assets to cache on install
@@ -56,6 +70,19 @@ self.addEventListener('fetch', (event) => {
     // Skip chrome extension requests
     if (event.request.url.startsWith('chrome-extension://')) return;
 
+    const url = new URL(event.request.url);
+
+    // POS start-up reads: network first, cached copy when offline
+    if (OFFLINE_API_READS.includes(url.pathname)) {
+        event.respondWith(
+            networkFirstWithCache(event.request).catch(() => new Response(
+                JSON.stringify({ error: 'Offline - API unavailable' }),
+                { headers: { 'Content-Type': 'application/json' }, status: 503 }
+            ))
+        );
+        return;
+    }
+
     // API requests: Network first, no cache
     if (event.request.url.includes('/api/')) {
         event.respondWith(
@@ -68,6 +95,16 @@ self.addEventListener('fetch', (event) => {
                     }
                 );
             })
+        );
+        return;
+    }
+
+    // The POS page itself: keep the last good copy so it can be reopened offline
+    if (event.request.mode === 'navigate' && OFFLINE_PAGES.includes(url.pathname)) {
+        event.respondWith(
+            networkFirstWithCache(event.request).catch(() =>
+                caches.match(OFFLINE_URL).then(r => r || new Response('Offline', { headers: { 'Content-Type': 'text/html' } }))
+            )
         );
         return;
     }

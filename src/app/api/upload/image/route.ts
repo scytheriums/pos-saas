@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, requirePermission } from '@/lib/auth';
 import { saveImage } from '@/lib/upload';
 
 export async function POST(request: NextRequest) {
@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
         if (!type || !['logo', 'product'].includes(type)) {
             return NextResponse.json({ error: 'Invalid type. Must be "logo" or "product"' }, { status: 400 });
         }
+
+        const denied = type === 'logo'
+            ? await requirePermission(authResult.user, 'EDIT', 'SETTINGS')
+            : await requirePermission(authResult.user, 'CREATE', 'PRODUCTS');
+        if (denied) return denied;
 
         // Determine subfolder based on type
         const subfolder = type === 'logo' ? 'logos' : 'products';

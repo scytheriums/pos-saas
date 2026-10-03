@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 
 export async function POST(request: Request) {
     try {
@@ -9,6 +9,8 @@ export async function POST(request: Request) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'EDIT', 'INVENTORY');
+        if (denied) return denied;
         const { userId, tenantId } = authResult.user;
 
         const body = await request.json();
@@ -18,13 +20,27 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        const qty = Number(quantity);
+        if (!Number.isInteger(qty) || qty === 0) {
+            return NextResponse.json({ error: "Quantity must be a whole number other than 0" }, { status: 400 });
+        }
+
+        // Variant must belong to this tenant
+        const owned = await prisma.productVariant.findFirst({
+            where: { id: variantId, product: { tenantId } },
+            select: { id: true },
+        });
+        if (!owned) {
+            return NextResponse.json({ error: "Product variant not found" }, { status: 404 });
+        }
+
         // Transaction to ensure atomicity
         const result = await prisma.$transaction(async (tx) => {
             // 1. Create the adjustment record
             const adjustment = await tx.stockAdjustment.create({
                 data: {
                     productVariantId: variantId,
-                    quantity: parseInt(quantity),
+                    quantity: qty,
                     reason,
                     notes: notes || null,
                     userId: userId,
@@ -37,7 +53,7 @@ export async function POST(request: Request) {
                 where: { id: variantId },
                 data: {
                     stock: {
-                        increment: parseInt(quantity),
+                        increment: qty,
                     },
                 },
             });
@@ -57,12 +73,21 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
     try {
+        const authResult = await getAuthUser();
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+        }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'INVENTORY');
+        if (denied) return denied;
+        const { tenantId } = authResult.user;
+
         const { searchParams } = new URL(request.url);
-        const limit = parseInt(searchParams.get("limit") || "20");
-        const page = parseInt(searchParams.get("page") || "1");
+        const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20") || 20, 1), 100);
+        const page = Math.max(parseInt(searchParams.get("page") || "1") || 1, 1);
         const skip = (page - 1) * limit;
 
         const adjustments = await prisma.stockAdjustment.findMany({
+            where: { tenantId },
             take: limit,
             skip: skip,
             orderBy: {
@@ -79,7 +104,7 @@ export async function GET(request: Request) {
             },
         });
 
-        const total = await prisma.stockAdjustment.count();
+        const total = await prisma.stockAdjustment.count({ where: { tenantId } });
 
         return NextResponse.json({
             adjustments,

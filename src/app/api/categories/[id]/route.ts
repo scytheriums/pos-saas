@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, requirePermission } from '@/lib/auth';
 import { logCrudAudit } from '@/lib/audit';
 
 // Helper function to check for circular reference
@@ -34,6 +34,8 @@ export async function PUT(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'EDIT', 'CATEGORIES');
+        if (denied) return denied;
 
         const { user } = authResult;
         const { id } = params;
@@ -129,6 +131,8 @@ export async function DELETE(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'DELETE', 'CATEGORIES');
+        if (denied) return denied;
 
         const { user } = authResult;
         const { id } = params;

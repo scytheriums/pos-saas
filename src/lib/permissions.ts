@@ -2,7 +2,9 @@ import { prisma } from './prisma';
 import { PermissionAction, PermissionResource } from '@prisma/client';
 
 /**
- * Check if a user has a specific permission
+ * Check if a user has a specific permission.
+ * Owners can do everything. Users without a custom role fall back to the
+ * built-in template for their role (manager / cashier).
  */
 export async function hasPermission(
     userId: string,
@@ -21,25 +23,31 @@ export async function hasPermission(
             }
         });
 
-        if (!user || !user.userRole) {
+        if (!user) {
             return false;
         }
 
-        // Check if user's role has the specific permission
-        const hasSpecificPermission = user.userRole.permissions.some(
-            p => p.action === action && p.resource === resource
-        );
+        if (user.role === 'owner') {
+            return true;
+        }
 
-        // Check if user's role has MANAGE permission for the resource (grants all actions)
-        const hasManagePermission = user.userRole.permissions.some(
-            p => p.action === 'MANAGE' && p.resource === resource
-        );
+        const permissions: { action: PermissionAction; resource: PermissionResource }[] =
+            user.userRole?.permissions ?? templateFor(user.role)?.permissions ?? [];
 
-        return hasSpecificPermission || hasManagePermission;
+        // MANAGE on a resource grants every action on it
+        return permissions.some(
+            p => p.resource === resource && (p.action === action || p.action === PermissionAction.MANAGE)
+        );
     } catch (error) {
         console.error('Permission check error:', error);
         return false;
     }
+}
+
+function templateFor(role: string | null) {
+    if (role === 'manager') return ROLE_TEMPLATES.Manager;
+    if (role === 'cashier') return ROLE_TEMPLATES.Cashier;
+    return null;
 }
 
 /**
@@ -84,6 +92,9 @@ export const ROLE_TEMPLATES = {
             { action: PermissionAction.MANAGE, resource: PermissionResource.DISCOUNTS },
             { action: PermissionAction.MANAGE, resource: PermissionResource.CATEGORIES },
             { action: PermissionAction.VIEW, resource: PermissionResource.ANALYTICS },
+            { action: PermissionAction.MANAGE, resource: PermissionResource.RETURNS },
+            { action: PermissionAction.MANAGE, resource: PermissionResource.PURCHASING },
+            { action: PermissionAction.MANAGE, resource: PermissionResource.EXPENSES },
         ],
     },
     Cashier: {
@@ -97,6 +108,9 @@ export const ROLE_TEMPLATES = {
             { action: PermissionAction.VIEW, resource: PermissionResource.CUSTOMERS },
             { action: PermissionAction.CREATE, resource: PermissionResource.CUSTOMERS },
             { action: PermissionAction.VIEW, resource: PermissionResource.DISCOUNTS },
+            // Cashiers can log a return; a manager approves it
+            { action: PermissionAction.VIEW, resource: PermissionResource.RETURNS },
+            { action: PermissionAction.CREATE, resource: PermissionResource.RETURNS },
         ],
     },
 };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth";
+import { SALE_STATUSES, getRefundsInPeriod } from "@/lib/refunds";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 export async function GET(req: NextRequest) {
@@ -9,6 +10,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ANALYTICS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
         const orders = await prisma.order.findMany({
             where: {
                 tenantId,
-                status: "COMPLETED",
+                status: { in: [...SALE_STATUSES] },
                 createdAt: {
                     gte: startDate,
                     lte: endDate,
@@ -55,6 +58,12 @@ export async function GET(req: NextRequest) {
         });
         const totalExpenses = Number((expenseAgg._sum as any)?.amount ?? 0);
 
+        // Refunds paid out in the period reduce revenue; goods put back on the shelf are no longer a cost
+        const refunds = await getRefundsInPeriod(prisma, tenantId, startDate, endDate);
+        const grossRevenue = totalRevenue;
+        totalRevenue = grossRevenue - refunds.total;
+        totalCost -= refunds.restockedCost;
+
         const totalProfit = totalRevenue - totalCost - totalExpenses;
         const margin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
         const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -66,6 +75,8 @@ export async function GET(req: NextRequest) {
             averageOrderValue,
             margin,
             totalExpenses,
+            grossRevenue,
+            totalRefunds: refunds.total,
         });
 
     } catch (error) {

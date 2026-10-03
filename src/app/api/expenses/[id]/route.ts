@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 
 // PUT /api/expenses/[id] — update an expense
 export async function PUT(
@@ -13,6 +13,8 @@ export async function PUT(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'EDIT', 'EXPENSES');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
         const { id } = await params;
 
@@ -59,6 +61,8 @@ export async function DELETE(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'DELETE', 'EXPENSES');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
         const { id } = await params;
 

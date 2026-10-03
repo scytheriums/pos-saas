@@ -52,12 +52,18 @@ export default function SignUpPage() {
 
         // If signed up via invite token, process invitation
         if (inviteToken) {
-            await fetch(`/api/invitations/accept`, {
+            const res = await fetch(`/api/invitations/accept`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: inviteToken }),
             });
-            router.push('/dashboard/analytics');
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError(`Your account was created, but the invitation couldn't be accepted: ${data.error || 'unknown error'}. Ask the store owner for a new invitation link.`);
+                setLoading(false);
+                return;
+            }
+            router.push('/dashboard');
         } else {
             router.push('/onboarding');
         }
@@ -161,7 +167,7 @@ export default function SignUpPage() {
                     <CardFooter className="justify-center">
                         <p className="text-sm text-muted-foreground">
                             Already have an account?{' '}
-                            <Link href="/sign-in" className="text-primary font-medium hover:underline">
+                            <Link href={inviteToken ? `/sign-in?invite=${encodeURIComponent(inviteToken)}` : "/sign-in"} className="text-primary font-medium hover:underline">
                                 Sign in
                             </Link>
                         </p>

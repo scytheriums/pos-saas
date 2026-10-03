@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { SALE_STATUSES, getRefundsInPeriod } from "@/lib/refunds";
+import { getAuthUser, requirePermission } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
     try {
@@ -9,6 +10,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ANALYTICS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
@@ -44,6 +47,7 @@ export async function GET(req: NextRequest) {
         const orders = await prisma.order.findMany({
             where: {
                 tenantId,
+                status: { in: [...SALE_STATUSES] },
                 createdAt: {
                     gte: startDate,
                     lte: endDate
@@ -74,7 +78,10 @@ export async function GET(req: NextRequest) {
 
         // Calculate metrics
         const totalOrders = orders.length;
-        const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total), 0);
+        const grossRevenue = orders.reduce((sum, order) => sum + Number(order.total), 0);
+        const refunds = await getRefundsInPeriod(prisma, tenantId, startDate, endDate);
+        const totalRefunds = refunds.total;
+        const totalRevenue = grossRevenue - totalRefunds;
         const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
         // Calculate top selling products
@@ -116,6 +123,8 @@ export async function GET(req: NextRequest) {
             endDate: endDate.toISOString().split('T')[0],
             totalOrders,
             totalRevenue,
+            grossRevenue,
+            totalRefunds,
             averageOrderValue,
             topSellingProducts
         });

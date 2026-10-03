@@ -7,7 +7,7 @@
  * - Sync status tracking per order
  */
 
-import { db, SyncQueueItem } from './db';
+import { db, OfflineOrder } from './db';
 
 const BASE_RETRY_DELAY_MS = 2000; // 2s base
 const MAX_ATTEMPTS = 5;
@@ -96,6 +96,9 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
                     customerId: order.customerId,
                     discountId: order.discountId,
                     discountAmount: order.discountAmount,
+                    paymentEntries: order.paymentEntries,
+                    shiftId: order.shiftId ?? null,
+                    redeemPoints: order.redeemPoints ?? 0,
                     offlineClientId: order.offlineClientId,
                     clientLastModifiedAt: order.lastModifiedAt,
                 }),
@@ -111,32 +114,32 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
                 await db.orders.update(item.offlineOrderId, { synced: true });
                 await db.syncQueue.update(item.id, { status: 'done' });
                 synced++;
+            } else if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+                // The server refused this sale (e.g. out of stock): retrying won't help, a person must look at it
+                const body = await res.json().catch(() => ({}));
+                await db.syncQueue.update(item.id, {
+                    attempts: item.attempts + 1,
+                    status: 'failed',
+                    lastError: body.error || `Rejected by the server (HTTP ${res.status})`,
+                    nextRetryAt: Infinity,
+                });
+                failed++;
             } else {
-                const errorText = await res.text();
-                throw new Error(`HTTP ${res.status}: ${errorText}`);
+                throw new Error(`Server error (HTTP ${res.status})`);
             }
         } catch (error) {
             const newAttempts = item.attempts + 1;
             const errorMsg = error instanceof Error ? error.message : String(error);
+            const gaveUp = newAttempts >= MAX_ATTEMPTS;
 
-            if (newAttempts >= MAX_ATTEMPTS) {
-                // Give up — mark as permanently failed
-                await db.syncQueue.update(item.id, {
-                    attempts: newAttempts,
-                    status: 'failed',
-                    lastError: errorMsg,
-                    nextRetryAt: Infinity,
-                });
-            } else {
-                // Schedule retry with exponential backoff
-                await db.syncQueue.update(item.id, {
-                    attempts: newAttempts,
-                    status: 'failed',
-                    lastError: errorMsg,
-                    nextRetryAt: Date.now() + nextRetryDelay(newAttempts),
-                });
-            }
-            failed++;
+            // Temporary problems stay pending and retry later; only give up after MAX_ATTEMPTS
+            await db.syncQueue.update(item.id, {
+                attempts: newAttempts,
+                status: gaveUp ? 'failed' : 'pending',
+                lastError: gaveUp ? `Couldn't reach the server after ${newAttempts} tries: ${errorMsg}` : errorMsg,
+                nextRetryAt: gaveUp ? Infinity : Date.now() + nextRetryDelay(newAttempts),
+            });
+            if (gaveUp) failed++;
         }
     }
 
@@ -177,4 +180,35 @@ export async function retryAllFailed(): Promise<void> {
                 })
             )
     );
+}
+
+/** Items left as 'syncing' when a tab closed mid-request: put them back in the queue. */
+export async function recoverInterruptedSyncs(): Promise<void> {
+    await db.syncQueue.where('status').equals('syncing').modify({ status: 'pending', nextRetryAt: Date.now() });
+}
+
+export interface FailedSale {
+    queueId: number;
+    error: string;
+    order: OfflineOrder | undefined;
+}
+
+/** Sales that need a person: rejected by the server, or unreachable after every retry. */
+export async function getFailedSales(): Promise<FailedSale[]> {
+    const items = await db.syncQueue.where('status').equals('failed').toArray();
+    return Promise.all(items.map(async item => ({
+        queueId: item.id!,
+        error: item.lastError || 'Unknown error',
+        order: await db.orders.get(item.offlineOrderId),
+    })));
+}
+
+/** Remove a failed sale from this device after it has been dealt with by hand. */
+export async function discardFailedSale(queueId: number): Promise<void> {
+    const item = await db.syncQueue.get(queueId);
+    if (!item) return;
+    await db.transaction('rw', db.syncQueue, db.orders, async () => {
+        await db.syncQueue.delete(queueId);
+        await db.orders.delete(item.offlineOrderId);
+    });
 }

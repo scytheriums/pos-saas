@@ -31,6 +31,9 @@ enum PermissionResource {
   ANALYTICS
   USERS
   SETTINGS
+  RETURNS
+  PURCHASING // Suppliers and purchase orders
+  EXPENSES
 }
 
 model Tenant {
@@ -348,6 +351,12 @@ model Order {
   discountId     String?
   discount       Discount?      @relation(fields: [discountId], references: [id])
   discountAmount Decimal?
+  // Breakdown of the total (null on orders created before these were recorded)
+  subtotal       Decimal?       // After item discounts, before tax
+  taxAmount      Decimal?
+  pointsRedeemed Int            @default(0)
+  pointsDiscount Decimal        @default(0)
+  pointsEarned   Int            @default(0)
   returns        Return[]
   createdAt      DateTime       @default(now())
   lastModifiedAt DateTime       @default(now()) @updatedAt
@@ -392,6 +401,7 @@ model Shift {
   tenant         Tenant      @relation(fields: [tenantId], references: [id])
   orders         Order[]
   pettyCashPayouts PettyCashPayout[]
+  cashRefunds    Return[]
   createdAt      DateTime    @default(now())
 
   @@index([tenantId])
@@ -592,7 +602,11 @@ model Return {
   
   processedBy     String
   processedByName String
-  
+
+  // Shift whose drawer paid out a cash refund
+  shiftId         String?
+  shift           Shift?        @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
   items           ReturnItem[]
   
   createdAt       DateTime      @default(now())
@@ -601,6 +615,7 @@ model Return {
   @@index([tenantId, createdAt])
   @@index([tenantId, orderId])
   @@index([tenantId, status])
+  @@index([shiftId])
 }
 
 model ReturnItem {

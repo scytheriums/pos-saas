@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
+import { getShiftCash } from "@/lib/shift-cash";
 
 // GET /api/shifts/[id] — get a single shift with full summary
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -10,6 +11,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ORDERS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
         const { id } = await params;
 
@@ -34,29 +37,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: "Shift not found" }, { status: 404 });
         }
 
-        // Build payment method breakdown
-        const breakdown: Record<string, number> = {};
-        for (const order of shift.orders) {
-            if (order.paymentEntries.length > 0) {
-                for (const e of order.paymentEntries) {
-                    breakdown[e.method] = (breakdown[e.method] ?? 0) + Number(e.amount);
-                }
-            } else if (order.paymentMethod) {
-                breakdown[order.paymentMethod] = (breakdown[order.paymentMethod] ?? 0) + Number(order.total);
-            }
-        }
-
-        const cashSales = breakdown['CASH'] ?? 0;
-
-        // Deduct petty cash payouts from expected cash
-        const payoutAgg = await prisma.pettyCashPayout.aggregate({
-            where: { shiftId: id },
-            _sum: { amount: true },
-        });
-        const totalPayouts = Number((payoutAgg._sum as any)?.amount ?? 0);
-
-        const expectedCash = Number(shift.openingFloat) + cashSales - totalPayouts;
-        const grossRevenue = shift.orders.reduce((s: number, o: any) => s + Number(o.total), 0);
+        const cash = await getShiftCash(prisma, shift);
+        const { breakdown, cashSales, totalPayouts, cashRefunds, expectedCash } = cash;
+        const grossRevenue = cash.totalRevenue;
 
         // Fetch individual payouts for display
         const payouts = await prisma.pettyCashPayout.findMany({
@@ -73,6 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 grossRevenue,
                 paymentBreakdown: breakdown,
                 totalPayouts,
+                cashRefunds,
                 payouts,
             },
         });
@@ -90,6 +74,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'CREATE', 'ORDERS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
         const { id } = await params;
 
@@ -107,20 +93,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: "Invalid actual cash amount" }, { status: 400 });
         }
 
-        // Calculate expected cash: float + cash sales - petty cash payouts
-        const cashAgg = await prisma.order.aggregate({
-            where: { shiftId: id, status: 'COMPLETED', paymentMethod: 'CASH' },
-            _sum: { total: true },
-        });
-        const cashSales = Number((cashAgg._sum as any)?.total ?? 0);
-
-        const payoutAgg = await prisma.pettyCashPayout.aggregate({
-            where: { shiftId: id },
-            _sum: { amount: true },
-        });
-        const totalPayouts = Number((payoutAgg._sum as any)?.amount ?? 0);
-
-        const expectedCash = Number(shift.openingFloat) + cashSales - totalPayouts;
+        // Same calculation as the shift summary: float + cash taken - payouts - cash refunds
+        const { cashSales, expectedCash } = await getShiftCash(prisma, shift);
         const difference = actualCash - expectedCash;
 
         const closed = await prisma.shift.update({

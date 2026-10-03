@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 
 // POST /api/discounts/validate - Validate discount code and calculate discount
 export async function POST(req: NextRequest) {
@@ -9,6 +9,8 @@ export async function POST(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'DISCOUNTS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const body = await req.json();
@@ -87,7 +89,9 @@ export async function POST(req: NextRequest) {
                 id: discount.id,
                 name: discount.name,
                 type: discount.type,
-                value: discount.value,
+                value: Number(discount.value),
+                maxDiscount: discount.maxDiscount !== null ? Number(discount.maxDiscount) : null,
+                minPurchase: discount.minPurchase !== null ? Number(discount.minPurchase) : null,
             },
             discountAmount,
             finalTotal: subtotal - discountAmount,

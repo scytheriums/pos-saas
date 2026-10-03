@@ -32,6 +32,8 @@ import {
 import { useState, useRef } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { canAccessPath } from "@/lib/page-access";
 
 const PRIMARY_TABS = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/analytics" },
@@ -103,6 +105,11 @@ export function MobileBottomNav() {
     const [sheetMounted, setSheetMounted] = useState(false);
     const [sheetVisible, setSheetVisible] = useState(false);
     const sheetRef = useRef<HTMLDivElement>(null);
+    const permissions = usePermissions();
+    const primaryTabs = PRIMARY_TABS.filter(tab => canAccessPath(tab.href, permissions));
+    const moreSections = MORE_SECTIONS
+        .map(section => ({ ...section, items: section.items.filter(item => canAccessPath(item.href, permissions)) }))
+        .filter(section => section.items.length > 0);
     const sheetScrollRef = useRef<HTMLDivElement>(null);
     const touchStartY = useRef(0);
 
@@ -144,7 +151,7 @@ export function MobileBottomNav() {
     const isActive = (href: string) =>
         pathname === href || pathname.startsWith(href + "/");
 
-    const anyMoreActive = MORE_SECTIONS.flatMap((s) => s.items).some((i) =>
+    const anyMoreActive = moreSections.flatMap((s) => s.items).some((i) =>
         isActive(i.href)
     );
 
@@ -155,7 +162,7 @@ export function MobileBottomNav() {
                 style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
                 <div className="flex items-stretch">
-                    {PRIMARY_TABS.map((tab) => {
+                    {primaryTabs.map((tab) => {
                         const active = isActive(tab.href);
                         return (
                             <Link
@@ -226,7 +233,7 @@ export function MobileBottomNav() {
 
                         {/* Scrollable sections */}
                         <div ref={sheetScrollRef} className="overflow-y-auto overscroll-contain flex-1 px-4 pb-4 space-y-4">
-                            {MORE_SECTIONS.map((section) => (
+                            {moreSections.map((section) => (
                                 <div key={section.title}>
                                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
                                         {section.title}

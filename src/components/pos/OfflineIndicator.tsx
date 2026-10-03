@@ -3,17 +3,57 @@ import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'luc
 import { Button } from '@/components/ui/button';
 import { db } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { processSyncQueue, retryAllFailed } from '@/lib/sync';
+import { processSyncQueue, retryAllFailed, recoverInterruptedSyncs, getFailedSales, discardFailedSale, FailedSale } from '@/lib/sync';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+const RETRY_INTERVAL_MS = 30_000;
 
 export function OfflineIndicator() {
     const [isOnline, setIsOnline] = useState(true);
     const [syncing, setSyncing] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [failedSales, setFailedSales] = useState<FailedSale[]>([]);
+    const [confirmDiscard, setConfirmDiscard] = useState<number | null>(null);
 
     // Live counts from sync queue
     const pendingCount = useLiveQuery(() => db.syncQueue.where('status').equals('pending').count(), [], 0);
     const syncingCount = useLiveQuery(() => db.syncQueue.where('status').equals('syncing').count(), [], 0);
     const failedCount = useLiveQuery(() => db.syncQueue.where('status').equals('failed').count(), [], 0);
     const unsyncedCount = (pendingCount ?? 0) + (syncingCount ?? 0) + (failedCount ?? 0);
+
+    // A tab closed mid-sync leaves items "syncing": queue them again
+    useEffect(() => {
+        recoverInterruptedSyncs().catch(() => {});
+    }, []);
+
+    // Keep retrying pending sales in the background while online
+    useEffect(() => {
+        if (!isOnline || (pendingCount ?? 0) === 0) return;
+        const timer = setInterval(() => {
+            if (!navigator.onLine) return;
+            processSyncQueue().catch(err => console.warn('Background sync failed', err));
+        }, RETRY_INTERVAL_MS);
+        return () => clearInterval(timer);
+    }, [isOnline, pendingCount]);
+
+    const openReview = async () => {
+        setFailedSales(await getFailedSales());
+        setConfirmDiscard(null);
+        setReviewOpen(true);
+    };
+
+    const retryOne = async () => {
+        setReviewOpen(false);
+        await handleSync();
+    };
+
+    const discard = async (queueId: number) => {
+        await discardFailedSale(queueId);
+        const remaining = await getFailedSales();
+        setFailedSales(remaining);
+        setConfirmDiscard(null);
+        if (remaining.length === 0) setReviewOpen(false);
+    };
 
     useEffect(() => {
         setIsOnline(navigator.onLine);
@@ -110,6 +150,60 @@ export function OfflineIndicator() {
                     Sync
                 </Button>
             )}
+            {hasFailed && (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 bg-white/60 hover:bg-white/90 border-0 text-xs font-semibold"
+                    onClick={openReview}
+                >
+                    Review
+                </Button>
+            )}
+
+            <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Sales that didn&apos;t sync</DialogTitle>
+                        <DialogDescription>
+                            These sales were completed at the till but the server didn&apos;t record them.
+                            Fix the cause (for example, restock the item), then retry. Remove a sale only after
+                            you&apos;ve recorded it another way.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {failedSales.map(sale => (
+                            <div key={sale.queueId} className="border rounded-md p-3 space-y-1 text-sm">
+                                <div className="flex justify-between gap-2 font-medium">
+                                    <span>{sale.order ? new Date(sale.order.timestamp).toLocaleString('id-ID') : 'Sale'}</span>
+                                    <span>Rp {Number(sale.order?.total ?? 0).toLocaleString('id-ID')}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {sale.order?.items.length ?? 0} item(s)
+                                </div>
+                                <p className="text-xs text-red-700">{sale.error}</p>
+                                <div className="flex justify-end gap-2 pt-1">
+                                    {confirmDiscard === sale.queueId ? (
+                                        <>
+                                            <span className="text-xs self-center">Remove this sale from this device?</span>
+                                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setConfirmDiscard(null)}>Keep</Button>
+                                            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => discard(sale.queueId)}>Remove</Button>
+                                        </>
+                                    ) : (
+                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirmDiscard(sale.queueId)}>Remove…</Button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex justify-end">
+                        <Button size="sm" onClick={retryOne} disabled={!isOnline || isSyncing}>
+                            <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                            Retry all
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

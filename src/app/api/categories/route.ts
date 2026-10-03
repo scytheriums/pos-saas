@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, requirePermission } from '@/lib/auth';
 import { logCrudAudit } from '@/lib/audit';
 
 // Helper function to build category tree
@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'CREATE', 'CATEGORIES');
+        if (denied) return denied;
 
         const { user } = authResult;
         const body = await request.json();

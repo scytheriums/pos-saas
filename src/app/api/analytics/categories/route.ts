@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 export async function GET(req: NextRequest) {
@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ANALYTICS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);

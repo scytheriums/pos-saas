@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
+import { getShiftCash } from "@/lib/shift-cash";
 
 // GET /api/shifts — list shifts (most recent first, cursor-paginated)
 export async function GET(req: NextRequest) {
@@ -10,9 +11,12 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-        const { tenantId } = authResult.user;
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ORDERS');
+        if (denied) return denied;
+        const { tenantId, id: userId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
+        const mine = searchParams.get('mine') === '1'; // only the signed-in user's shifts (the POS drawer)
         const cursor = searchParams.get('cursor');
         const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
         const status = searchParams.get('status'); // 'OPEN' | 'CLOSED'
@@ -20,6 +24,7 @@ export async function GET(req: NextRequest) {
         const shifts = await prisma.shift.findMany({
             where: {
                 tenantId,
+                ...(mine ? { userId } : {}),
                 ...(status ? { status: status as any } : {}),
             },
             take: limit + 1,
@@ -38,27 +43,10 @@ export async function GET(req: NextRequest) {
         // Attach cash sales total and total revenue per shift
         const enriched = await Promise.all(
             data.map(async (shift) => {
-                const [cashAgg, totalAgg, payoutAgg] = await Promise.all([
-                    prisma.order.aggregate({
-                        where: { shiftId: shift.id, status: 'COMPLETED', paymentMethod: 'CASH' },
-                        _sum: { total: true },
-                    }),
-                    prisma.order.aggregate({
-                        where: { shiftId: shift.id, status: 'COMPLETED' },
-                        _sum: { total: true },
-                    }),
-                    prisma.pettyCashPayout.aggregate({
-                        where: { shiftId: shift.id },
-                        _sum: { amount: true },
-                    }),
-                ]);
-                const cashSales = Number((cashAgg._sum as any)?.total ?? 0);
-                const totalPayouts = Number((payoutAgg._sum as any)?.amount ?? 0);
-                const expectedCash = Number(shift.openingFloat) + cashSales - totalPayouts;
-                const totalRevenue = Number((totalAgg._sum as any)?.total ?? 0);
+                const { cashSales, expectedCash, totalPayouts, cashRefunds, totalRevenue } = await getShiftCash(prisma, shift);
                 const orderCount = shift._count.orders;
                 const { _count, ...rest } = shift;
-                return { ...rest, cashSales, expectedCash, totalPayouts, totalRevenue, orderCount };
+                return { ...rest, cashSales, expectedCash, totalPayouts, cashRefunds, totalRevenue, orderCount };
             })
         );
 
@@ -76,6 +64,8 @@ export async function POST(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'CREATE', 'ORDERS');
+        if (denied) return denied;
         const { tenantId, id: userId } = authResult.user;
 
         // Prevent opening a second shift if there's already an open one for this user

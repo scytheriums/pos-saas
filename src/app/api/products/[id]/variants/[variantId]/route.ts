@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, requirePermission } from '@/lib/auth';
 
 export async function GET(
     req: NextRequest,
@@ -13,6 +13,8 @@ export async function GET(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'PRODUCTS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const variant = await prisma.productVariant.findFirst({
@@ -54,6 +56,8 @@ export async function PATCH(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'EDIT', 'PRODUCTS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const body = await req.json();

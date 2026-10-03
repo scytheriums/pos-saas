@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 
 // PATCH /api/returns/[id]/reject - Reject a return request
@@ -14,6 +14,8 @@ export async function PATCH(
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'EDIT', 'RETURNS');
+        if (denied) return denied;
         const { tenantId, id: userId, name: userName } = authResult.user;
 
         const body = await req.json();
@@ -35,8 +37,9 @@ export async function PATCH(
         }
 
         // Update return status to rejected
-        const updatedReturn = await prisma.return.update({
-            where: { id },
+        // Only a still-pending return can be rejected (guards against a concurrent approval)
+        const rejected = await prisma.return.updateMany({
+            where: { id, tenantId, status: "PENDING" },
             data: {
                 status: "REJECTED",
                 reasonNote: rejectionReason || returnRecord.reasonNote,
@@ -45,6 +48,10 @@ export async function PATCH(
                 processedByName: userName
             }
         });
+        if (rejected.count === 0) {
+            return NextResponse.json({ error: "This return has already been processed" }, { status: 409 });
+        }
+        const updatedReturn = await prisma.return.findUniqueOrThrow({ where: { id } });
 
         // Log audit trail
         await logAudit({

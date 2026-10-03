@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { SALE_STATUSES, getRefundsInPeriod } from "@/lib/refunds";
+import { getAuthUser, requirePermission } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
     try {
@@ -9,6 +10,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ANALYTICS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
@@ -36,6 +39,7 @@ export async function GET(req: NextRequest) {
         const orders = await prisma.order.findMany({
             where: {
                 tenantId,
+                status: { in: [...SALE_STATUSES] },
                 createdAt: {
                     gte: startDate,
                     lte: endDate
@@ -68,6 +72,9 @@ export async function GET(req: NextRequest) {
             }
         });
 
+        // Refunds come off revenue on the day they were paid out
+        const refunds = await getRefundsInPeriod(prisma, tenantId, startDate, endDate);
+
         // Fill in missing dates with zero values
         const data: { date: string; revenue: number; orders: number }[] = [];
         const currentDate = new Date(startDate);
@@ -78,7 +85,7 @@ export async function GET(req: NextRequest) {
 
             data.push({
                 date: dateKey,
-                revenue: salesData?.revenue || 0,
+                revenue: (salesData?.revenue || 0) - (refunds.byDate.get(dateKey) ?? 0),
                 orders: salesData?.orders || 0
             });
 

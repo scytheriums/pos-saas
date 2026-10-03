@@ -14,6 +14,8 @@ import { PettyCashModal } from "@/components/pos/PettyCashModal";
 import { OfflineIndicator } from "@/components/pos/OfflineIndicator";
 import { db } from "@/lib/db";
 import { enqueueSyncOrder } from "@/lib/sync";
+import { calculateOrderTotals } from "@/lib/order-totals";
+import { syncCatalog, searchCachedProducts, findCachedByCode } from "@/lib/catalog";
 import Link from "next/link";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { VariantSelector } from "@/components/pos/VariantSelector";
@@ -84,14 +86,14 @@ export default function POSPage() {
     const [customerName, setCustomerName] = useState("");
     const [discountCode, setDiscountCode] = useState("");
     const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
-    const [discountAmount, setDiscountAmount] = useState(0);
     const [validatingDiscount, setValidatingDiscount] = useState(false);
     const [discountError, setDiscountError] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; email?: string } | null>(null);
     const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
     const [customerPoints, setCustomerPoints] = useState<number | null>(null);
     const [redeemPointsInput, setRedeemPointsInput] = useState("");
-    const [redeemDiscount, setRedeemDiscount] = useState(0);
+    // Points the customer is redeeming on this sale (the rupiah value is derived in the totals)
+    const [redeemPoints, setRedeemPoints] = useState(0);
 
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -142,7 +144,7 @@ export default function POSPage() {
     useEffect(() => {
         async function checkShift() {
             try {
-                const res = await fetch('/api/shifts?status=OPEN&limit=1');
+                const res = await fetch('/api/shifts?status=OPEN&mine=1&limit=1');
                 if (res.ok) {
                     const data = await res.json();
                     if (data.data && data.data.length > 0) {
@@ -158,42 +160,79 @@ export default function POSPage() {
         checkShift();
     }, []);
 
+    // Next-page cursor from the products API, and whether the list came from the offline catalog
+    // (refs so changing them doesn't refetch)
+    const nextCursorRef = useRef<string | null>(null);
+    const fromCacheRef = useRef(false);
+
     // Reset pagination when search query changes
     useEffect(() => {
+        nextCursorRef.current = null;
         setPage(1);
         setHasMore(true);
     }, [debouncedSearch]);
 
-    // Fetch products from API
+    // Keep a local copy of the catalog for offline selling and scanning
+    useEffect(() => {
+        const sync = () => { if (navigator.onLine) syncCatalog().catch(err => console.warn('Catalog sync failed', err)); };
+        sync();
+        window.addEventListener('online', sync);
+        return () => window.removeEventListener('online', sync);
+    }, []);
+
+    // Fetch products from API, or from the local catalog when offline
     useEffect(() => {
         async function fetchProducts() {
             setLoading(true);
+            const append = (newProducts: any[]) => {
+                if (page === 1) {
+                    setProducts(newProducts);
+                } else {
+                    setProducts(prev => {
+                        const existingIds = new Set(prev.map(p => p.id));
+                        return [...prev, ...newProducts.filter((p: any) => !existingIds.has(p.id))];
+                    });
+                }
+            };
+
+            const fromCache = async () => {
+                const cached = await searchCachedProducts(debouncedSearch, (page - 1) * 20, 20);
+                append(cached);
+                fromCacheRef.current = true;
+                nextCursorRef.current = null;
+                setHasMore(cached.length === 20);
+            };
+
             try {
+                // Later pages come from wherever page 1 came from
+                if (page > 1 && fromCacheRef.current) {
+                    await fromCache();
+                    return;
+                }
+                if (page > 1 && !nextCursorRef.current) {
+                    return; // search just changed; the page-1 fetch is on its way
+                }
                 const params = new URLSearchParams();
                 if (debouncedSearch) params.append('search', debouncedSearch);
-                params.append('page', page.toString());
+                if (page > 1 && nextCursorRef.current) params.append('cursor', nextCursorRef.current);
                 params.append('limit', '20');
                 params.append('sellable', 'true');
 
                 const res = await fetch(`/api/products?${params.toString()}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    const newProducts = data.products || [];
-
-                    if (page === 1) {
-                        setProducts(newProducts);
-                    } else {
-                        setProducts(prev => {
-                            const existingIds = new Set(prev.map(p => p.id));
-                            const uniqueNewProducts = newProducts.filter((p: any) => !existingIds.has(p.id));
-                            return [...prev, ...uniqueNewProducts];
-                        });
-                    }
-
-                    setHasMore(newProducts.length === 20);
-                }
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                append(data.products || []);
+                fromCacheRef.current = false;
+                nextCursorRef.current = data.nextCursor ?? null;
+                setHasMore(!!data.hasMore);
             } catch (error) {
-                console.error("Failed to fetch products", error);
+                // Offline or server unreachable: use the cached catalog
+                try {
+                    await fromCache();
+                } catch {
+                    console.error("Failed to fetch products", error);
+                    setHasMore(false);
+                }
             } finally {
                 setLoading(false);
             }
@@ -284,17 +323,21 @@ export default function POSPage() {
     };
 
     // Barcode Scanner Logic
-    useBarcodeScanner((code) => {
-        console.log("Scanned:", code);
-        // Check variants first as they are the sellable units
-        for (const p of products) {
-            if (p.variants) {
-                const variant = p.variants.find((v: any) => v.barcode === code);
+    useBarcodeScanner(async (code) => {
+        // Products on screen first, then the whole cached catalog; match barcode, then SKU
+        for (const match of [(v: any) => v.barcode === code, (v: any) => v.sku === code]) {
+            for (const p of products) {
+                const variant = p.variants?.find(match);
                 if (variant) {
                     addToCart(p, variant);
                     return;
                 }
             }
+        }
+        const cached = await findCachedByCode(code).catch(() => null);
+        if (cached) {
+            addToCart(cached.product, cached.variant);
+            return;
         }
         alert(`Product not found: ${code}`);
         playSound('error', settings);
@@ -327,17 +370,32 @@ export default function POSPage() {
         }));
     };
 
-    const total = cart.reduce((sum, item) => sum + item.price * item.quantity - (item.itemDiscount || 0), 0);
-    const taxRate = (tenant?.taxRate ?? 0) / 100;
-    const tax = total * taxRate;
-    const grandTotal = total + tax - discountAmount - redeemDiscount;
+    // Same calculation the server uses to check the order (src/lib/order-totals.ts)
+    const taxRate = Number(tenant?.taxRate ?? 0) / 100;
+    const totals = calculateOrderTotals({
+        lines: cart.map(item => ({ price: item.price, quantity: item.quantity, itemDiscount: item.itemDiscount })),
+        taxRatePercent: Number(tenant?.taxRate ?? 0),
+        discount: appliedDiscount ? {
+            type: appliedDiscount.type,
+            value: Number(appliedDiscount.value),
+            maxDiscount: appliedDiscount.maxDiscount != null ? Number(appliedDiscount.maxDiscount) : null,
+            minPurchase: appliedDiscount.minPurchase != null ? Number(appliedDiscount.minPurchase) : null,
+        } : null,
+        pointsRedeemed: redeemPoints,
+        pointRedemptionRate: settings.pointRedemptionRate ?? 0,
+    });
+    const total = totals.subtotal;
+    const tax = totals.tax;
+    const discountAmount = totals.discountAmount;
+    const redeemDiscount = totals.pointsDiscount;
+    const grandTotal = totals.total;
 
     // When customer changes, fetch their points balance
     const handleSelectCustomer = async (customer: { id: string; name: string; email?: string } | null) => {
         setSelectedCustomer(customer);
         setCustomerPoints(null);
         setRedeemPointsInput("");
-        setRedeemDiscount(0);
+        setRedeemPoints(0);
         if (customer) {
             try {
                 const res = await fetch(`/api/customers/${customer.id}`);
@@ -357,13 +415,12 @@ export default function POSPage() {
         const minPts = settings.minimumRedeemPoints ?? 0;
         const maxPts = customerPoints ?? 0;
         if (pts < minPts || rate === 0) return;
-        const capped = Math.min(pts, maxPts);
-        setRedeemDiscount(Math.floor(capped * rate));
+        setRedeemPoints(Math.min(pts, maxPts));
     };
 
     const removeRedeemPoints = () => {
         setRedeemPointsInput("");
-        setRedeemDiscount(0);
+        setRedeemPoints(0);
     };
 
     const applyDiscount = async () => {
@@ -381,14 +438,12 @@ export default function POSPage() {
             if (res.ok) {
                 const data = await res.json();
                 setAppliedDiscount(data.discount);
-                setDiscountAmount(data.discountAmount);
                 playSound('success', settings);
                 // alert(`Discount applied: ${data.discount.name}`); // Removed alert for better UX
             } else {
                 const error = await res.json();
                 setDiscountError(error.error || 'Invalid discount code');
                 setAppliedDiscount(null);
-                setDiscountAmount(0);
                 playSound('error', settings);
             }
         } catch (error) {
@@ -401,7 +456,6 @@ export default function POSPage() {
 
     const removeDiscount = () => {
         setAppliedDiscount(null);
-        setDiscountAmount(0);
         setDiscountCode("");
         setDiscountError("");
     };
@@ -539,11 +593,10 @@ export default function POSPage() {
         setCart([]);
         setDiscountCode("");
         setAppliedDiscount(null);
-        setDiscountAmount(0);
         setSelectedCustomer(null);
         setCustomerPoints(null);
         setRedeemPointsInput("");
-        setRedeemDiscount(0);
+        setRedeemPoints(0);
     };
 
     const handleCheckout = () => {
@@ -576,48 +629,63 @@ export default function POSPage() {
             discountId: appliedDiscount?.id,
             discountAmount: discountAmount,
             shiftId: activeShift?.id ?? null,
-            redeemPoints: redeemDiscount > 0 && settings.pointRedemptionRate > 0
-                ? Math.floor(redeemDiscount / settings.pointRedemptionRate)
-                : 0,
+            redeemPoints,
+        };
+
+        // Saves the sale on this device; it syncs when the connection is back
+        const saveOffline = async () => {
+            const offlineClientId = crypto.randomUUID();
+            const now = Date.now();
+            const offlineId = await db.orders.add({
+                items: orderData.items,
+                total: orderData.total,
+                timestamp: now,
+                synced: false,
+                tenantId: orderData.tenantId,
+                paymentMethod: primaryMethod,
+                cashTendered,
+                change: orderData.change,
+                customerId: orderData.customerId,
+                discountId: orderData.discountId,
+                discountAmount: orderData.discountAmount,
+                paymentEntries,
+                shiftId: orderData.shiftId,
+                redeemPoints: orderData.redeemPoints,
+                offlineClientId,
+                lastModifiedAt: now,
+            });
+            await enqueueSyncOrder(offlineId as number);
+            processSuccessfulOrder(`OFF-${offlineId}`, session?.user?.name || "Cashier", true, paymentEntries);
         };
 
         try {
-            if (navigator.onLine) {
-                const res = await fetch('/api/orders', {
+            if (!navigator.onLine) {
+                await saveOffline();
+                return;
+            }
+
+            let res: Response;
+            try {
+                res = await fetch('/api/orders', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(orderData),
                 });
-
-                if (!res.ok) throw new Error("Checkout failed");
-                const data = await res.json();
-                processSuccessfulOrder(data.order.id, "Current Cashier", false, paymentEntries, data.pointsEarned ?? 0); // Replace with actual cashier name
-            } else {
-                // Offline fallback — generate a UUID for deduplication
-                const offlineClientId = crypto.randomUUID();
-                const now = Date.now();
-                const offlineId = await db.orders.add({
-                    items: orderData.items,
-                    total: orderData.total,
-                    timestamp: now,
-                    synced: false,
-                    tenantId: orderData.tenantId,
-                    paymentMethod: primaryMethod,
-                    cashTendered,
-                    change: orderData.change,
-                    customerId: orderData.customerId,
-                    discountId: orderData.discountId,
-                    discountAmount: orderData.discountAmount,
-                    offlineClientId,
-                    lastModifiedAt: now,
-                });
-                // Add to sync queue for retry when back online
-                await enqueueSyncOrder(offlineId as number);
-                processSuccessfulOrder(`OFF-${offlineId}`, "Offline Cashier", true, paymentEntries);
+            } catch {
+                // The request never reached the server (flaky connection): keep the sale offline
+                await saveOffline();
+                return;
             }
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Checkout failed. Please try again.");
+            }
+            const data = await res.json();
+            processSuccessfulOrder(data.order.id, data.order.cashierName || session?.user?.name || "Cashier", false, paymentEntries, data.pointsEarned ?? 0);
         } catch (error) {
             console.error("Checkout error:", error);
-            alert("Checkout failed. Please try again.");
+            alert(error instanceof Error ? error.message : "Checkout failed. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -810,7 +878,7 @@ export default function POSPage() {
                             onChange={(e) => {
                                 const val = Math.min(parseInt(e.target.value) || 0, customerPoints);
                                 setRedeemPointsInput(val > 0 ? val.toString() : "");
-                                setRedeemDiscount(val > 0 ? Math.floor(val * settings.pointRedemptionRate) : 0);
+                                setRedeemPoints(val >= (settings.minimumRedeemPoints ?? 0) ? val : 0);
                             }}
                             className="h-9 text-xs flex-1"
                         />

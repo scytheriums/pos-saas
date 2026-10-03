@@ -7,6 +7,8 @@ export interface OfflineProduct {
     category: string;
     variants: any[]; // Storing variants as JSON structure
     updatedAt: number;
+    /** The product exactly as GET /api/products returns it (not indexed) */
+    product?: any;
 }
 
 export interface OfflineOrder {
@@ -25,6 +27,10 @@ export interface OfflineOrder {
     discountAmount?: number;
     lastModifiedAt?: number; // Client-side last modified timestamp (ms)
     offlineClientId?: string; // UUID for server-side deduplication
+    // Not indexed, so no new Dexie version is needed for these
+    paymentEntries?: { method: string; amount: number }[];
+    shiftId?: string | null;
+    redeemPoints?: number;
 }
 
 export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'done';

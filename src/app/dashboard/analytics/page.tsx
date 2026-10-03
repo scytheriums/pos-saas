@@ -21,6 +21,7 @@ interface SummaryData {
     averageOrderValue: number;
     margin: number;
     totalExpenses?: number;
+    totalRefunds?: number;
 }
 
 interface ProductStat {
@@ -277,7 +278,9 @@ export default function AnalyticsPage() {
                     title="Revenue"
                     value={formatCurrencyWithSettings(summary?.totalRevenue || 0, settings)}
                     icon={DollarSign}
-                    description="Gross revenue"
+                    description={summary?.totalRefunds
+                        ? `After ${formatCurrencyWithSettings(summary.totalRefunds, settings)} refunds`
+                        : "After refunds"}
                 />
                 <MetricCard
                     className="gap-0 py-3 lg:py-6"

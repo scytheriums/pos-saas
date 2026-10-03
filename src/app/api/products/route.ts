@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 import { logCrudAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
             console.error('Auth error:', authResult.error);
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'CREATE', 'PRODUCTS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const body = await req.json();
@@ -311,6 +313,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'PRODUCTS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         // Pagination parameters
@@ -330,7 +334,8 @@ export async function GET(req: NextRequest) {
             ...(search ? {
                 OR: [
                     { name: { contains: search, mode: 'insensitive' } },
-                    { variants: { some: { sku: { contains: search, mode: 'insensitive' } } } }
+                    { variants: { some: { sku: { contains: search, mode: 'insensitive' } } } },
+                    { variants: { some: { barcode: search } } }
                 ]
             } : {})
         };
@@ -364,6 +369,7 @@ export async function GET(req: NextRequest) {
                     select: {
                         id: true,
                         sku: true,
+                        barcode: true,
                         price: true,
                         stock: true,
                         imageUrl: true,

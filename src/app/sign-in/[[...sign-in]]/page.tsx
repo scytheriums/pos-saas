@@ -15,6 +15,7 @@ export default function SignInPage() {
     const searchParams = useSearchParams();
     const redirectUrl = searchParams.get('redirect_url') || '/dashboard/analytics';
     const onboardingComplete = searchParams.get('onboarding') === 'complete';
+    const inviteToken = searchParams.get('invite');
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -38,6 +39,24 @@ export default function SignInPage() {
             return;
         }
 
+        // Existing account joining a team from an invitation link
+        if (inviteToken) {
+            const res = await fetch('/api/invitations/accept', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: inviteToken }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError(`You're signed in, but the invitation couldn't be accepted: ${data.error || 'unknown error'}`);
+                setLoading(false);
+                return;
+            }
+            router.push('/dashboard');
+            router.refresh();
+            return;
+        }
+
         router.push(redirectUrl);
         router.refresh();
     };
@@ -45,6 +64,11 @@ export default function SignInPage() {
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
             <div className="w-full max-w-md px-4">
+                {inviteToken && (
+                    <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800">
+                        Sign in to accept your team invitation. New here? Create an account instead.
+                    </div>
+                )}
                 {onboardingComplete && (
                     <div className="mb-6 rounded-lg bg-green-50 border border-green-200 p-4">
                         <div className="flex items-center">
@@ -125,7 +149,7 @@ export default function SignInPage() {
                     <CardFooter className="justify-center">
                         <p className="text-sm text-muted-foreground">
                             Don&apos;t have an account?{' '}
-                            <Link href="/sign-up" className="text-primary font-medium hover:underline">
+                            <Link href={inviteToken ? `/sign-up?invite=${encodeURIComponent(inviteToken)}` : "/sign-up"} className="text-primary font-medium hover:underline">
                                 Create one
                             </Link>
                         </p>

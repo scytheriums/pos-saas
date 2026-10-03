@@ -1,6 +1,7 @@
 import { auth } from '@/lib/better-auth';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import type { PermissionAction, PermissionResource } from '@prisma/client';
 
 export type UserRole = 'owner' | 'manager' | 'cashier';
 
@@ -105,3 +106,20 @@ export function unauthorizedResponse(message: string = 'Unauthorized') {
 }
 
 
+
+/**
+ * Returns a 403 response when the user lacks the permission, or null when allowed.
+ * Usage: `const denied = await requirePermission(authResult.user, 'EDIT', 'PRODUCTS'); if (denied) return denied;`
+ */
+export async function requirePermission(
+    user: AuthUser,
+    action: PermissionAction,
+    resource: PermissionResource
+): Promise<NextResponse | null> {
+    const { hasPermission } = await import('@/lib/permissions');
+    if (await hasPermission(user.id, action, resource)) return null;
+    return NextResponse.json(
+        { error: "You don't have permission to do this. Ask the store owner for access." },
+        { status: 403 }
+    );
+}

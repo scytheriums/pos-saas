@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, requirePermission } from "@/lib/auth";
 
 // GET /api/petty-cash — list payouts, optionally filtered by shiftId
 export async function GET(req: NextRequest) {
@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'VIEW', 'ORDERS');
+        if (denied) return denied;
         const { tenantId } = authResult.user;
 
         const { searchParams } = new URL(req.url);
@@ -44,6 +46,8 @@ export async function POST(req: NextRequest) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
+        const denied = await requirePermission(authResult.user, 'CREATE', 'ORDERS');
+        if (denied) return denied;
         const { tenantId, id: userId } = authResult.user;
 
         const body = await req.json();
@@ -67,8 +71,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Active shift not found" }, { status: 404 });
         }
 
-        const [payout] = await prisma.$transaction([
-            prisma.pettyCashPayout.create({
+        // The payout and its expense are saved together, or not at all
+        const payout = await prisma.$transaction(async (tx) => {
+            const created = await tx.pettyCashPayout.create({
                 data: {
                     amount: new Prisma.Decimal(Number(amount)),
                     reason: String(reason).trim(),
@@ -77,21 +82,23 @@ export async function POST(req: NextRequest) {
                     createdBy: userId,
                 },
                 include: { user: { select: { id: true, name: true } } },
-            }),
-        ]);
+            });
 
-        // Also record as an Expense so it appears in the expenses dashboard
-        await prisma.expense.create({
-            data: {
-                amount: new Prisma.Decimal(Number(amount)),
-                category: 'PETTY_CASH',
-                date: payout.createdAt,
-                notes: String(reason).trim(),
-                referenceType: 'PETTY_CASH',
-                referenceId: payout.id,
-                tenantId,
-                createdBy: userId,
-            },
+            // Also record as an Expense so it appears in the expenses dashboard
+            await tx.expense.create({
+                data: {
+                    amount: new Prisma.Decimal(Number(amount)),
+                    category: 'PETTY_CASH',
+                    date: created.createdAt,
+                    notes: String(reason).trim(),
+                    referenceType: 'PETTY_CASH',
+                    referenceId: created.id,
+                    tenantId,
+                    createdBy: userId,
+                },
+            });
+
+            return created;
         });
 
         return NextResponse.json({ payout }, { status: 201 });

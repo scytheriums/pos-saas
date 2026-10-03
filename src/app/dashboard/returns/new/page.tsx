@@ -62,8 +62,8 @@ export default function CreateReturnPage() {
             setSelectedItems({
                 ...selectedItems,
                 [itemId]: {
-                    quantity: item.quantity,
-                    refundAmount: Number(item.price) * item.quantity
+                    quantity: item.returnableQuantity,
+                    refundAmount: item.refundableUnitPrice * item.returnableQuantity
                 }
             });
         }
@@ -77,17 +77,20 @@ export default function CreateReturnPage() {
             ...selectedItems,
             [itemId]: {
                 quantity,
-                refundAmount: Number(item.price) * quantity
+                refundAmount: item.refundableUnitPrice * quantity
             }
         });
     };
 
     const updateRefundAmount = (itemId: string, amount: number) => {
+        // Can't refund more than the customer paid for these units
+        const item = order.items.find((i: any) => i.id === itemId);
+        const max = item.refundableUnitPrice * selectedItems[itemId].quantity;
         setSelectedItems({
             ...selectedItems,
             [itemId]: {
                 ...selectedItems[itemId],
-                refundAmount: amount
+                refundAmount: Math.min(amount, max)
             }
         });
     };
@@ -120,9 +123,7 @@ export default function CreateReturnPage() {
                 const orderItem = order.items.find((i: any) => i.id === itemId);
                 return {
                     orderItemId: itemId,
-                    variantId: orderItem.variantId,
                     quantity: data.quantity,
-                    price: Number(orderItem.price),
                     refundAmount: data.refundAmount
                 };
             });
@@ -227,6 +228,11 @@ export default function CreateReturnPage() {
                                     <Label className="text-muted-foreground">Payment</Label>
                                     <div className="font-medium">{order.paymentMethod || "N/A"}</div>
                                 </div>
+                                {order.refundedAmount > 0 && (
+                                    <div className="col-span-2 md:col-span-4 text-sm text-muted-foreground">
+                                        Already refunded or pending: Rp {Number(order.refundedAmount).toLocaleString("id-ID")} · still refundable: Rp {Number(order.refundableAmount).toLocaleString("id-ID")}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -254,6 +260,7 @@ export default function CreateReturnPage() {
                                             <TableCell>
                                                 <Checkbox
                                                     checked={!!selectedItems[item.id]}
+                                                    disabled={item.returnableQuantity === 0}
                                                     onCheckedChange={() => toggleItem(item.id, item)}
                                                 />
                                             </TableCell>
@@ -261,15 +268,22 @@ export default function CreateReturnPage() {
                                                 {item.variant?.product?.name || "Unknown Product"}
                                             </TableCell>
                                             <TableCell>Rp {Number(item.price).toLocaleString()}</TableCell>
-                                            <TableCell>{item.quantity}</TableCell>
+                                            <TableCell>
+                                                {item.quantity}
+                                                {item.returnedQuantity > 0 && (
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        {item.returnableQuantity === 0 ? "Fully returned" : `${item.returnedQuantity} already returned`}
+                                                    </span>
+                                                )}
+                                            </TableCell>
                                             <TableCell>
                                                 {selectedItems[item.id] ? (
                                                     <Input
                                                         type="number"
                                                         min="1"
-                                                        max={item.quantity}
+                                                        max={item.returnableQuantity}
                                                         value={selectedItems[item.id].quantity}
-                                                        onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value), item.quantity)}
+                                                        onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value), item.returnableQuantity)}
                                                         className="w-20"
                                                     />
                                                 ) : (
@@ -337,6 +351,9 @@ export default function CreateReturnPage() {
                                     <SelectItem value="OTHER">Other</SelectItem>
                                 </SelectContent>
                             </Select>
+                            {reason === "DEFECTIVE" && (
+                                <p className="text-xs text-muted-foreground mt-1">Defective items won&apos;t be put back into stock.</p>
+                            )}
                         </div>
 
                         <div>
