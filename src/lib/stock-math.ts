@@ -54,35 +54,45 @@ export function splitStock(total: number, units: { id: string; factor: number }[
     return counts;
 }
 
-/** A row in a unit ladder: contains `containsQty` × the row above it, or × base units if `countInBase`. */
+/**
+ * A selling-unit row: 1 of it contains `containsQty` × `containsRef`, where the ref is an earlier
+ * row's id or BASE_REF. With no ref it means "the row above" (the first row: base units).
+ * Only earlier rows can be referenced, so sizes can never loop.
+ */
 export interface LadderRow {
     id: string;
     containsQty?: number;
-    countInBase?: boolean;
+    containsRef?: string;
 }
 
-/** Ladder rows as definitions for `resolveFactors`: the first row (and any `countInBase` row) counts in base units. */
+/** Rows as definitions for `resolveFactors`; a ref to anything but an earlier row falls back to the row above. */
 export function ladderDefinitions(rows: LadderRow[]): UnitDefinition[] {
-    return rows.map((r, i) => ({
-        id: r.id,
-        containsQty: Math.max(1, Math.floor(r.containsQty ?? 1)),
-        containsRef: i === 0 || r.countInBase ? BASE_REF : rows[i - 1].id,
-    }));
-}
-
-/** How to describe a size `factor` sitting above a row of size `prevFactor`: N × that row if it divides, else in base units. */
-export function ladderStep(factor: number, prevFactor: number): { containsQty: number; countInBase: boolean } {
-    return prevFactor > 1 && factor % prevFactor === 0
-        ? { containsQty: factor / prevFactor, countInBase: false }
-        : { containsQty: factor, countInBase: prevFactor !== 1 };
-}
-
-/** Order saved units small → big and describe each relative to the one below it (Box 144 above Pack 12 → 12 × Pack). */
-export function inferLadder<T extends { id: string; conversionFactor?: number }>(rows: T[]): (T & { containsQty: number; countInBase: boolean })[] {
-    const sorted = [...rows].sort((a, b) => (a.conversionFactor ?? 1) - (b.conversionFactor ?? 1));
-    return sorted.map((r, i) => {
-        const factor = r.conversionFactor ?? 1;
-        const prev = i === 0 ? 1 : sorted[i - 1].conversionFactor ?? 1;
-        return { ...r, ...ladderStep(factor, prev) };
+    return rows.map((r, i) => {
+        const earlier = rows.slice(0, i).map(x => x.id);
+        const fallback = i === 0 ? BASE_REF : rows[i - 1].id;
+        const ref = r.containsRef && (r.containsRef === BASE_REF || earlier.includes(r.containsRef)) ? r.containsRef : fallback;
+        return { id: r.id, containsQty: Math.max(1, Math.floor(r.containsQty ?? 1)), containsRef: ref };
     });
+}
+
+/**
+ * Describe a size in terms of the largest earlier unit that divides it evenly, else in base units:
+ * Box 144 with Pack 12 → 12 × Pack; Box 50 with Dozen 12 → 50 × base.
+ */
+export function bestRef(factor: number, earlier: { id: string; factor: number }[]): { containsQty: number; containsRef: string } {
+    const parent = earlier
+        .filter(e => e.factor > 1 && e.factor < factor && factor % e.factor === 0)
+        .sort((a, b) => b.factor - a.factor)[0];
+    return parent
+        ? { containsQty: factor / parent.factor, containsRef: parent.id }
+        : { containsQty: factor, containsRef: BASE_REF };
+}
+
+/** Order saved units small → big and describe each in terms of a smaller one (Box 144 pcs → 12 × Pack). */
+export function inferLadder<T extends { id: string; conversionFactor?: number }>(rows: T[]): (T & { containsQty: number; containsRef: string })[] {
+    const sorted = [...rows].sort((a, b) => (a.conversionFactor ?? 1) - (b.conversionFactor ?? 1));
+    return sorted.map((r, i) => ({
+        ...r,
+        ...bestRef(r.conversionFactor ?? 1, sorted.slice(0, i).map(e => ({ id: e.id, factor: e.conversionFactor ?? 1 }))),
+    }));
 }

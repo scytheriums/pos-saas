@@ -18,6 +18,8 @@ interface ProductBasicInfoCardProps {
     isSellable?: boolean;
     isPurchasable?: boolean;
     disabled?: boolean;
+    /** Show the minimum-stock field here (the stepped product form shows it with stock instead) */
+    showMinStock?: boolean;
     onNameChange: (value: string) => void;
     onDescriptionChange: (value: string) => void;
     onImageChange: (url: string | null) => void;
@@ -36,6 +38,7 @@ export function ProductBasicInfoCard({
     isSellable = true,
     isPurchasable = true,
     disabled,
+    showMinStock = true,
     onNameChange,
     onDescriptionChange,
     onImageChange,
@@ -120,7 +123,7 @@ export function ProductBasicInfoCard({
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="space-y-1.5">
+                {showMinStock && <div className="space-y-1.5">
                     <Label htmlFor="minStock">Minimum Stock Threshold</Label>
                     <Input
                         id="minStock"
@@ -133,7 +136,7 @@ export function ProductBasicInfoCard({
                     <p className="text-xs text-muted-foreground">
                         You&apos;ll be alerted when stock falls below this level
                     </p>
-                </div>
+                </div>}
                 <div className="border-t pt-3 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                         <div>

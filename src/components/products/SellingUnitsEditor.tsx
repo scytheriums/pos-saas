@@ -5,13 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { Plus, Trash2, AlertCircle, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { availableUnits, resolveFactors, splitStock, ladderDefinitions, ladderStep } from '@/lib/stock-math';
+import { availableUnits, resolveFactors, splitStock, ladderDefinitions, BASE_REF } from '@/lib/stock-math';
 import type { ProductFormVariant } from '@/components/products/ProductForm';
 
 export interface UnitOption {
@@ -70,7 +69,8 @@ export function SellingUnitsEditor({
     const [openPanels, setOpenPanels] = useState<Set<string>>(new Set());
     const [counts, setCounts] = useState<Record<string, number>>(() => splitStock(sharedStock, stockSlots(rows)));
 
-    const { error: ladderError } = resolveFactors(ladderDefinitions(rows));
+    const definitions = ladderDefinitions(rows);
+    const { error: ladderError } = resolveFactors(definitions);
     const slots = stockSlots(rows);
     const totalOf = (c: Record<string, number>, s: { id: string; factor: number }[]) =>
         s.reduce((sum, slot) => sum + (c[slot.id] ?? 0) * slot.factor, 0);
@@ -114,7 +114,8 @@ export function SellingUnitsEditor({
                 imageUrl: null,
                 unitId: rows.length === 0 ? baseUnitId || null : null,
                 containsQty: 1,
-                countInBase: false,
+                // New units are made of the unit above by default
+                containsRef: rows.length > 0 ? rows[rows.length - 1].id : BASE_REF,
                 priceAuto: true,
                 conversionFactor: 1,
             },
@@ -127,13 +128,14 @@ export function SellingUnitsEditor({
     const removeRow = (id: string) => {
         const index = rows.findIndex(r => r.id === id);
         if (index < 0) return;
-        const next = rows.filter(r => r.id !== id);
-        // The unit that sat on the removed one is re-described against its new neighbour below
-        if (next[index]) {
-            const factor = next[index].conversionFactor ?? 1;
-            const below = index > 0 ? next[index - 1].conversionFactor ?? 1 : 1;
-            next[index] = { ...next[index], ...ladderStep(factor, below) };
-        }
+        // Units made of the removed one are re-pointed to what it was made of, keeping their size
+        const defs = ladderDefinitions(rows);
+        const removed = defs[index];
+        const next = rows
+            .map((r, i) => defs[i].containsRef === id
+                ? { ...r, containsQty: defs[i].containsQty * removed.containsQty, containsRef: removed.containsRef }
+                : { ...r, containsQty: defs[i].containsQty, containsRef: defs[i].containsRef })
+            .filter(r => r.id !== id);
         const nextCounts = splitStock(sharedStock, stockSlots(next));
         setCounts(nextCounts);
         commit(next, nextCounts);
@@ -211,9 +213,9 @@ export function SellingUnitsEditor({
 
                     {rows.map((row, i) => {
                         const factor = row.conversionFactor ?? 1;
-                        const above = rows[i - 1];
-                        const inBase = i === 0 || row.countInBase;
-                        const refLabel = inBase ? baseAbbr : (unitName(above?.unitId) ?? 'unit above');
+                        const ref = definitions[i]?.containsRef ?? BASE_REF;
+                        const earlier = rows.slice(0, i);
+                        const refLabel = ref === BASE_REF ? baseAbbr : (unitName(rows.find(r => r.id === ref)?.unitId) ?? 'unit');
                         const panelOpen = openPanels.has(row.id) || expandIds.includes(row.id);
                         const name = unitName(row.unitId) ?? 'this unit';
                         return (
@@ -234,7 +236,7 @@ export function SellingUnitsEditor({
                                         </Select>
                                     </div>
 
-                                    {/* Contains: N × the unit above (or base units) */}
+                                    {/* Contains: N × base units or a smaller unit (the unit above by default) */}
                                     <div className="col-span-3 sm:col-span-1 min-w-0">
                                         <span className="sm:hidden text-[10px] text-muted-foreground">Contains</span>
                                         <div className="flex items-center gap-1.5 text-sm">
@@ -249,8 +251,29 @@ export function SellingUnitsEditor({
                                                 aria-label={`How many ${refLabel} in one ${name}`}
                                             />
                                             <span className="text-muted-foreground shrink-0">×</span>
-                                            <span className="truncate">{refLabel}</span>
-                                            {!inBase && !ladderError && (
+                                            {i === 0 ? (
+                                                <span className="truncate">{baseAbbr}</span>
+                                            ) : (
+                                                <Select
+                                                    value={ref}
+                                                    // Switching what it's made of keeps the size as close as possible
+                                                    onValueChange={(newRef) => {
+                                                        const refFactor = newRef === BASE_REF ? 1 : rows.find(r => r.id === newRef)?.conversionFactor ?? 1;
+                                                        updateRow(row.id, { containsRef: newRef, containsQty: Math.max(1, Math.round(factor / refFactor)) });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2" aria-label={`What one ${name} is made of`}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value={BASE_REF}>{baseAbbr}</SelectItem>
+                                                        {earlier.map(r => (
+                                                            <SelectItem key={r.id} value={r.id}>{unitName(r.unitId) ?? 'Unnamed unit'}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                            {ref !== BASE_REF && !ladderError && (
                                                 <span className="text-xs text-muted-foreground shrink-0 tabular-nums">= {factor}</span>
                                             )}
                                         </div>
@@ -332,19 +355,6 @@ export function SellingUnitsEditor({
                                                 />
                                             </div>
                                         </div>
-                                        {i > 0 && (
-                                            <label className="flex items-center gap-2 text-xs pb-1.5">
-                                                <Switch
-                                                    checked={!!row.countInBase}
-                                                    onCheckedChange={(on) => updateRow(row.id, on
-                                                        // Same size, now written in base units
-                                                        ? { countInBase: true, containsQty: factor }
-                                                        // Back to "N × the unit above": nearest whole number of it
-                                                        : { countInBase: false, containsQty: Math.max(1, Math.round(factor / (above?.conversionFactor ?? 1))) })}
-                                                />
-                                                Count in {baseAbbr} instead of {unitName(above?.unitId) ?? 'the unit above'}
-                                            </label>
-                                        )}
                                         <p className="text-xs text-muted-foreground pb-1.5 basis-full">
                                             1 {name} = {factor} {baseAbbr} · cost Rp {(poolCost * factor).toLocaleString('id-ID')} · {availableUnits(sharedStock, factor)} available
                                         </p>
