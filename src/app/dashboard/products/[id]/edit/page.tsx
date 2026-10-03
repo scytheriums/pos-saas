@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
-import { ProductBasicInfoCard } from '@/components/products/ProductBasicInfoCard';
-import { VariantMatrixEditor } from '@/components/products/VariantMatrixEditor';
+import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ProductForm, ProductFormValues } from '@/components/products/ProductForm';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,40 +21,24 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CostHistoryTab from "@/components/products/CostHistoryTab";
 
-interface VariantState {
-    id: string;
-    optionValueIds: string[];
-    sku: string;
-    price: number;
-    cost: number;
-    stock: number;
-    imageUrl?: string | null;
-}
-
-interface OptionState {
-    id: string;
-    name: string;
-    values: { id: string; value: string }[];
-}
-
-interface Product {
-    id: string;
+interface ApiProduct {
     name: string;
     description: string | null;
     imageUrl: string | null;
     minStock: number;
     categoryId: string | null;
-    hasVariants: boolean;
-    options: OptionState[];
-    variants: Array<{
+    isSellable?: boolean;
+    isPurchasable?: boolean;
+    options?: { id: string; name: string; values?: { id: string; value: string }[] }[];
+    variants?: {
         id: string;
         sku: string;
-        price: number;
-        cost: number;
+        price: string | number;
+        cost: string | number;
         stock: number;
         imageUrl?: string | null;
-        optionValues: Array<{ id: string; value: string }>;
-    }>;
+        optionValues?: { id: string }[];
+    }[];
 }
 
 export default function EditProductPage() {
@@ -64,22 +47,9 @@ export default function EditProductPage() {
     const productId = params.id as string;
 
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [product, setProduct] = useState<Product | null>(null);
-
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [minStock, setMinStock] = useState(10);
-    const [categoryId, setCategoryId] = useState<string>('');
-    const [isSellable, setIsSellable] = useState(true);
-    const [isPurchasable, setIsPurchasable] = useState(true);
-
-    // Variant state (mirrors VariantMatrixEditor format)
-    const [options, setOptions] = useState<OptionState[]>([]);
-    const [variants, setVariants] = useState<VariantState[]>([]);
+    const [initialValues, setInitialValues] = useState<ProductFormValues | null>(null);
 
     useEffect(() => {
         fetchProduct();
@@ -91,92 +61,54 @@ export default function EditProductPage() {
             if (!response.ok) {
                 throw new Error('Product not found');
             }
-            const data = await response.json();
-            setProduct(data);
-            setName(data.name);
-            setDescription(data.description || '');
-            setImageUrl(data.imageUrl || null);
-            setMinStock(data.minStock);
-            setCategoryId(data.categoryId || '__none__');
-            setIsSellable(data.isSellable ?? true);
-            setIsPurchasable(data.isPurchasable ?? true);
-
-            // Map API options to VariantMatrixEditor format
-            setOptions((data.options ?? []).map((opt: any) => ({
+            const data: ApiProduct = await response.json();
+            const options = (data.options ?? []).map(opt => ({
                 id: opt.id,
                 name: opt.name,
-                values: (opt.values ?? []).map((v: any) => ({ id: v.id, value: v.value }))
-            })));
+                values: (opt.values ?? []).map(v => ({ id: v.id, value: v.value }))
+            }));
 
-            // Map API variants to VariantMatrixEditor format
-            setVariants((data.variants ?? []).map((v: any) => ({
-                id: v.id,
-                optionValueIds: (v.optionValues ?? []).map((ov: any) => ov.id),
-                sku: v.sku,
-                price: Number(v.price),
-                cost: Number(v.cost),
-                stock: v.stock,
-                imageUrl: v.imageUrl ?? null
-            })));
-        } catch (err: any) {
-            setError(err.message || 'Failed to load product');
+            setInitialValues({
+                name: data.name,
+                description: data.description || '',
+                imageUrl: data.imageUrl || null,
+                minStock: data.minStock,
+                categoryId: data.categoryId || '__none__',
+                isSellable: data.isSellable ?? true,
+                isPurchasable: data.isPurchasable ?? true,
+                hasVariants: options.length > 0,
+                options,
+                variants: (data.variants ?? []).map(v => ({
+                    id: v.id,
+                    optionValueIds: (v.optionValues ?? []).map(ov => ov.id),
+                    sku: v.sku,
+                    price: Number(v.price),
+                    cost: Number(v.cost),
+                    stock: v.stock,
+                    imageUrl: v.imageUrl ?? null
+                }))
+            });
+        } catch (err) {
+            setError((err instanceof Error && err.message) || 'Failed to load product');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        setError(null);
+    const handleSubmit = async (values: ProductFormValues) => {
+        // Saves base info and syncs options/variants (add, update, remove) in one request
+        const response = await fetch(`/api/products/${productId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(values)
+        });
 
-        try {
-            // 1. Save base product info
-            const productRes = await fetch(`/api/products/${productId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name,
-                    description,
-                    imageUrl,
-                    minStock,
-                    categoryId: categoryId === '__none__' ? null : categoryId,
-                    isSellable,
-                    isPurchasable
-                })
-            });
-
-            if (!productRes.ok) {
-                const data = await productRes.json();
-                throw new Error(data.error || 'Failed to update product');
-            }
-
-            // 2. Save each variant
-            for (const variant of variants) {
-                const variantRes = await fetch(`/api/products/${productId}/variants/${variant.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sku: variant.sku,
-                        price: variant.price,
-                        cost: variant.cost,
-                        stock: variant.stock,
-                        imageUrl: variant.imageUrl
-                    })
-                });
-
-                if (!variantRes.ok) {
-                    const data = await variantRes.json();
-                    throw new Error(data.error || `Failed to update variant ${variant.sku}`);
-                }
-            }
-
-            router.push('/dashboard/products');
-        } catch (err: any) {
-            setError(err.message || 'Failed to update product');
-        } finally {
-            setSaving(false);
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to update product');
         }
+
+        router.push('/dashboard/products');
     };
 
     const handleDelete = async () => {
@@ -194,8 +126,8 @@ export default function EditProductPage() {
             }
 
             router.push('/dashboard/products');
-        } catch (err: any) {
-            setError(err.message || 'Failed to delete product');
+        } catch (err) {
+            setError((err instanceof Error && err.message) || 'Failed to delete product');
             setDeleting(false);
         }
     };
@@ -209,11 +141,11 @@ export default function EditProductPage() {
         );
     }
 
-    if (error && !product) {
+    if (!initialValues) {
         return (
             <div className="space-y-3">
                 <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded text-sm">
-                    {error}
+                    {error || 'Failed to load product'}
                 </div>
                 <Link href="/dashboard/products" className="inline-block">
                     <Button variant="outline" size="sm">
@@ -245,7 +177,7 @@ export default function EditProductPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete &quot;{product?.name}&quot; and all its variants.
+                                    This will permanently delete &quot;{initialValues.name}&quot; and all its variants.
                                     This action cannot be undone.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
@@ -272,58 +204,14 @@ export default function EditProductPage() {
                     <TabsTrigger value="cost-history">Cost History</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="details" className="space-y-4">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Basic Information */}
-                        <ProductBasicInfoCard
-                            name={name}
-                            description={description}
-                            imageUrl={imageUrl}
-                            minStock={minStock}
-                            categoryId={categoryId}
-                            disabled={saving}
-                            onNameChange={setName}
-                            onDescriptionChange={setDescription}
-                            onImageChange={setImageUrl}
-                            onMinStockChange={setMinStock}
-                            onCategoryChange={setCategoryId}
-                            isSellable={isSellable}
-                            isPurchasable={isPurchasable}
-                            onIsSellableChange={setIsSellable}
-                            onIsPurchasableChange={setIsPurchasable}
-                        />
-
-                        {/* Variants */}
-                        {variants.length > 0 && (
-                            <VariantMatrixEditor
-                                options={options}
-                                variants={variants}
-                                onOptionsChange={setOptions}
-                                onVariantsChange={setVariants}
-                                hideOptions
-                            />
-                        )}
-
-                        {/* Error Message */}
-                        {error && (
-                            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
-                                {error}
-                            </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex justify-end gap-2">
-                            <Link href="/dashboard/products">
-                                <Button type="button" variant="outline" size="sm" disabled={saving}>
-                                    Cancel
-                                </Button>
-                            </Link>
-                            <Button type="submit" size="sm" disabled={saving}>
-                                <Save className="mr-1.5 h-3.5 w-3.5" />
-                                {saving ? 'Saving...' : 'Save Changes'}
-                            </Button>
+                {/* Kept mounted so unsaved form edits survive switching tabs */}
+                <TabsContent value="details" forceMount className="space-y-4 data-[state=inactive]:hidden">
+                    {error && (
+                        <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded text-sm">
+                            {error}
                         </div>
-                    </form>
+                    )}
+                    <ProductForm mode="edit" initialValues={initialValues} onSubmit={handleSubmit} />
                 </TabsContent>
 
                 <TabsContent value="cost-history">

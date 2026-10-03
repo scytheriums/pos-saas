@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Banknote, CreditCard, Smartphone, Building2, Plus, Trash2 } from 'lucide-react';
@@ -138,13 +139,10 @@ export function PaymentMethodSelector({ open, onClose, total, onConfirm, selecte
 
                                     <div className="space-y-1">
                                         <Label className="text-xs">Amount</Label>
-                                        <Input
-                                            type="number"
-                                            inputMode="numeric"
-                                            value={entry.amount || ''}
-                                            onChange={e => updateEntry(index, 'amount', parseFloat(e.target.value) || 0)}
+                                        <CurrencyInput
+                                            value={Number(entry.amount) || null}
+                                            onValueChange={v => updateEntry(index, 'amount', v ?? 0)}
                                             className="h-10 text-base"
-                                            placeholder="0"
                                         />
                                     </div>
 

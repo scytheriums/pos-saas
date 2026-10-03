@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -285,10 +286,9 @@ export default function NewPurchaseOrderPage() {
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-1">
                                                 <Label className="text-xs text-muted-foreground shrink-0">Unit Cost</Label>
-                                                <Input
-                                                    type="number" min={0} step="0.01"
+                                                <CurrencyInput
                                                     value={item.unitCost}
-                                                    onChange={e => updateItem(idx, { unitCost: parseFloat(e.target.value) || 0 })}
+                                                    onValueChange={v => updateItem(idx, { unitCost: v ?? 0 })}
                                                     className="h-7 flex-1 text-xs"
                                                 />
                                             </div>

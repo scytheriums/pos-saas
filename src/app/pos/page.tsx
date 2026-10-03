@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, ShoppingCart, Trash2, Plus, Minus, ScanBarcode, Globe, RotateCcw, Clock, Save, PackageOpen, Layers, ChevronDown, ChevronLeft, X, Bluetooth, BluetoothOff, Loader2, Tag, Timer, Banknote } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -757,13 +758,10 @@ export default function POSPage() {
                                     {editingDiscountId === (item.variantId || item.id) && (
                                         <div className="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-gray-100">
                                             <Tag className="w-3 h-3 text-green-500 shrink-0" />
-                                            <Input
-                                                type="number"
-                                                min="0"
+                                            <CurrencyInput
                                                 autoFocus
-                                                placeholder="0"
-                                                defaultValue={item.itemDiscount || ""}
-                                                onChange={(e) => updateItemDiscount(item.variantId || item.id, parseFloat(e.target.value) || 0)}
+                                                value={item.itemDiscount || null}
+                                                onValueChange={(v) => updateItemDiscount(item.variantId || item.id, v ?? 0)}
                                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingDiscountId(null); }}
                                                 className="h-6 text-xs px-1.5 py-0 flex-1 min-w-0 border-green-300 focus-visible:ring-green-400"
                                             />

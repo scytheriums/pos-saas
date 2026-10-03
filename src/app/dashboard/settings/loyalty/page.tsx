@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, Star } from 'lucide-react';
@@ -190,12 +191,12 @@ export default function LoyaltySettingsPage() {
                                                 <FormLabel>Rupiah Discount per Point Redeemed</FormLabel>
                                                 <FormControl>
                                                     <div className="flex items-center gap-3">
-                                                        <Input
-                                                            type="number"
-                                                            min="0"
-                                                            step="1"
+                                                        <CurrencyInput
                                                             className="max-w-32"
-                                                            {...field}
+                                                            name={field.name}
+                                                            onBlur={field.onBlur}
+                                                            value={Number(field.value) || null}
+                                                            onValueChange={(v) => field.onChange(v ?? 0)}
                                                         />
                                                         <span className="text-sm text-muted-foreground">
                                                             Rp per point

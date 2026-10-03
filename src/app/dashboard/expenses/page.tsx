@@ -6,6 +6,7 @@ import { formatCurrencyWithSettings, formatDateWithSettings } from '@/lib/format
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -474,13 +475,10 @@ export default function ExpensesPage() {
                     <div className="space-y-4 py-2">
                         <div className="space-y-1">
                             <Label htmlFor="exp-amount">Amount (Rp)</Label>
-                            <Input
+                            <CurrencyInput
                                 id="exp-amount"
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={form.amount}
-                                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                                value={form.amount ? parseFloat(form.amount) : null}
+                                onValueChange={v => setForm(f => ({ ...f, amount: v === null ? '' : String(v) }))}
                             />
                         </div>
                         <div className="space-y-1">

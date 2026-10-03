@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -142,16 +143,25 @@ export function DiscountDialog({ open, onClose, onSuccess, discount }: DiscountD
 
                         <div className="space-y-2">
                             <Label>Value *</Label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                placeholder={type === 'PERCENTAGE' ? '10' : '5.00'}
-                                value={value}
-                                onChange={(e) => setValue(e.target.value)}
-                                required
-                            />
+                            {type === 'PERCENTAGE' ? (
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="10"
+                                    value={value}
+                                    onChange={(e) => setValue(e.target.value)}
+                                    required
+                                />
+                            ) : (
+                                <CurrencyInput
+                                    placeholder="5.000"
+                                    value={value ? parseFloat(value) : null}
+                                    onValueChange={(v) => setValue(v === null ? '' : String(v))}
+                                    required
+                                />
+                            )}
                             <p className="text-xs text-muted-foreground">
-                                {type === 'PERCENTAGE' ? 'Percentage (0-100)' : 'Amount in dollars'}
+                                {type === 'PERCENTAGE' ? 'Percentage (0-100)' : 'Amount in Rupiah'}
                             </p>
                         </div>
                     </div>
@@ -159,12 +169,10 @@ export function DiscountDialog({ open, onClose, onSuccess, discount }: DiscountD
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Minimum Purchase</Label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="50.00"
-                                value={minPurchase}
-                                onChange={(e) => setMinPurchase(e.target.value)}
+                            <CurrencyInput
+                                placeholder="50.000"
+                                value={minPurchase ? parseFloat(minPurchase) : null}
+                                onValueChange={(v) => setMinPurchase(v === null ? '' : String(v))}
                             />
                             <p className="text-xs text-muted-foreground">Optional minimum purchase required</p>
                         </div>
@@ -172,12 +180,10 @@ export function DiscountDialog({ open, onClose, onSuccess, discount }: DiscountD
                         {type === 'PERCENTAGE' && (
                             <div className="space-y-2">
                                 <Label>Max Discount</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="10.00"
-                                    value={maxDiscount}
-                                    onChange={(e) => setMaxDiscount(e.target.value)}
+                                <CurrencyInput
+                                    placeholder="10.000"
+                                    value={maxDiscount ? parseFloat(maxDiscount) : null}
+                                    onValueChange={(v) => setMaxDiscount(v === null ? '' : String(v))}
                                 />
                                 <p className="text-xs text-muted-foreground">Cap for percentage discounts</p>
                             </div>

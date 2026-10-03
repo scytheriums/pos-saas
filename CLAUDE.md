@@ -1,0 +1,93 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+**Awan POS** — a multi-tenant SaaS point-of-sale system targeting Indonesian retailers (defaults: IDR currency, `Asia/Jakarta` timezone, `en`/`id` UI languages). Next.js 16 App Router + React 19, Prisma 5 on PostgreSQL (Neon), Better Auth, Tailwind v4 + shadcn/ui (new-york). Ships as a web app, an installable PWA with offline order capture, and an (early-stage) Electron wrapper.
+
+`ROADMAP.md` and `UI_UX_ROADMAP.md` track feature phases as checklists — check them before starting a feature, and tick items off when you complete them.
+
+## Commands
+
+```bash
+npm run dev              # Next dev server (Turbopack) on :3000
+npm run build            # prisma generate && next build
+npm run lint             # eslint (flat config, next core-web-vitals + typescript)
+npx tsc --noEmit         # type check (no dedicated script)
+
+npx prisma migrate dev --name <name>   # create + apply a migration
+npx prisma generate                    # regenerate client after schema edits
+npm run db:seed                        # tsx prisma/seed.ts
+
+npm run electron:dev     # dev server + Electron window
+```
+
+There is **no test framework**. `scripts/*.ts` are ad-hoc tsx scripts (e.g. `scripts/seed-100k.ts` for load data, `scripts/verify-product-logic.ts`); run with `npx tsx scripts/<file>.ts`. Env lives in `.env.local` (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`). Prisma CLI does not read `.env.local` automatically.
+
+## Architecture
+
+### Request auth & tenancy
+
+- **`src/proxy.ts`** is the Next 16 middleware (replaces `middleware.ts`; `src/middleware.ts.bak` is the old one). It only checks for the Better Auth session cookie — API routes get `401` JSON, pages redirect to `/sign-in?redirect_url=…`. It also does in-memory per-IP rate limiting for sign-in, sign-up, and `POST /api/orders`. Public paths are listed in `PUBLIC_PATHS`.
+- **`src/lib/better-auth.ts`** configures Better Auth (email/password, Prisma adapter). `tenantId` and `role` are `additionalFields` on the user, not user-settable. Catch-all handler: `src/app/api/auth/[...all]/route.ts`. Client: `src/lib/auth-client.ts`.
+- **`src/lib/auth.ts` → `getAuthUser()`** is the real auth gate for every API route. It returns either `{ user, tenantId }` or `{ error, status }` (403 if the user has no tenant yet → onboarding). Every route starts with:
+
+  ```ts
+  const authResult = await getAuthUser();
+  if ('error' in authResult) return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  const { tenantId } = authResult.user;
+  ```
+
+- **Tenant isolation is manual.** There is no Prisma middleware/extension enforcing it — every query must include `tenantId` in its `where` (use `findFirst({ where: { id, tenantId } })`, not `findUnique({ where: { id } })`, for single-record lookups). Child models (`ProductVariant`, `OrderItem`, `PaymentEntry`, `PurchaseOrderItem`, …) have no `tenantId` and are scoped through their parent.
+- **Tenant creation** happens in `POST /api/onboarding` (transaction: create `Tenant`, default roles, assign user). `createDefaultRoles()` in `src/lib/permissions.ts` seeds Owner/Manager/Cashier.
+- **Two authorization layers coexist:** a coarse `role` string on the user (`owner | manager | cashier`, checked with `hasRole`) and DB-backed RBAC (`UserRole` → `Permission` with `PermissionAction` × `PermissionResource`; `MANAGE` implies all actions), checked with `hasPermission(userId, action, resource)`. RBAC is currently only enforced in users/roles/audit-log routes; most routes just require authentication.
+
+### API conventions (`src/app/api/**/route.ts`)
+
+- Plain route handlers; no server actions, no tRPC. Dynamic params are async: `{ params }: { params: Promise<{ id: string }> }` → `const { id } = await params`.
+- List endpoints use **cursor pagination**: fetch `take: limit + 1`, return `{ data | <plural>, nextCursor, hasMore }`; `limit` capped at 100. Search uses `contains` + `mode: 'insensitive'`.
+- Errors: `NextResponse.json({ error: "..." }, { status })`, wrapped in try/catch with `console.error`.
+- Mutations call `logCrudAudit(...)` / `logAudit(...)` from `src/lib/audit.ts` (never throws). Adding a new audited entity means extending the `AuditResource` union there.
+- Multi-step stock/money changes (orders, returns approval, PO receiving, stock adjustments, petty cash) run inside `prisma.$transaction`.
+- `/api/debug/*` routes must keep their `NODE_ENV !== 'development'` guard.
+
+### Domain model (`prisma/schema.prisma`)
+
+`Tenant` is the root and also holds all settings (receipt, POS, localization, SKU auto-generation, loyalty, `enableStockManagement`). Key flows:
+
+- **Catalog:** `Product` → `ProductOption`/`ProductOptionValue` → `ProductVariant` (holds `sku`, `price`, `cost`, `stock`). Hierarchical `Category` (self-referencing `parentId`). SKUs generated by `src/lib/sku-generator.ts` using the tenant's `skuFormat`/`skuCounter`.
+- **Sales:** `Order` → `OrderItem` (snapshots `price`/`cost`/discount) + `PaymentEntry[]` (split payments), linked to an open `Shift`, optional `Customer` (loyalty points) and `Discount`. When `enableStockManagement` is false, order creation skips all stock checks/decrements.
+- **Cash:** `Shift` (open/close, expected vs counted cash), `PettyCashPayout` (deducted from shift), `Expense` (feeds net profit in analytics; has a polymorphic reference, e.g. to a purchase order).
+- **Returns:** `Return` → `ReturnItem`, with approve/reject endpoints that restock and refund.
+- **Purchasing:** `Supplier` → `PurchaseOrder` → `PurchaseOrderItem` (product variant or raw material). `POST /api/purchase-orders/[id]/receive` increments stock and can create an expense.
+- **Audit:** `AuditLog` with before/after JSON, exportable as CSV.
+
+Money fields are `Decimal` — convert with `Number(...)` before arithmetic/JSON on the client.
+
+Migration folders from April 2026 onward include hand-written timestamps (`20260410150000_…`); keep migration names descriptive and in order.
+
+### Frontend
+
+- `src/app/pos/page.tsx` — the cashier screen (large single client component: cart, variant selector, barcode scanner via `useBarcodeScanner`, held orders, split payments, shifts, petty cash, receipt printing).
+- `src/app/dashboard/**` — back-office pages, all client components that call `/api/*` with plain `fetch` + `useState`/`useEffect` (`@tanstack/react-query` is installed but unused). Layout: desktop `Sidebar`, mobile `MobileDashboardHeader` + `MobileBottomNav`, content wrapped in `ErrorBoundary`. New dashboard sections need entries in both `Sidebar.tsx` and `MobileBottomNav.tsx`.
+- Global providers (`src/app/providers.tsx`): `LanguageProvider` → `SettingsProvider` → `PrinterProvider`.
+  - **i18n:** all user-facing strings go in `src/lib/translations.ts` under both `en` and `id`; read via `useLanguage().t`.
+  - **Settings:** `useSettings()` / `useTenantSettings()` load tenant settings; format money/dates with the `*WithSettings` helpers in `src/lib/format.ts` (prefer these over `formatCurrency` in `src/lib/utils.ts`).
+  - **Printing:** `PrinterContext` drives ESC/POS thermal printers over Web Bluetooth (`esc-pos-encoder`); `ReceiptTemplate` is the browser-print fallback.
+- Forms: `react-hook-form` + `zod` (v4). Toasts: `sonner`. Icons: `lucide-react`. UI primitives in `src/components/ui` (add new ones via shadcn CLI per `components.json`). Path alias `@/*` → `src/*`. React Compiler is enabled (`reactCompiler: true`), so avoid manual memoization patterns that fight it.
+- Mobile/tablet responsiveness matters: breakpoint `lg` separates desktop sidebar layout from mobile bottom-nav layout.
+
+### Offline / PWA
+
+- `public/sw.js` is a hand-written service worker (registered inline in `src/app/layout.tsx`); bump `CACHE_NAME` when changing cached assets. Offline fallback page: `src/app/offline`.
+- `src/lib/db.ts` — Dexie IndexedDB (`NexusPOS_DB`) with `products`, `orders`, `syncQueue`. Schema changes require a new `this.version(n)` block, never editing old ones.
+- `src/lib/sync.ts` — replays offline orders to `POST /api/orders` with exponential backoff. Each offline order carries an `offlineClientId` (unique on `Order`) so the server deduplicates; conflict policy is server-wins via `lastModifiedAt`.
+
+### Uploads
+
+`POST /api/upload/image` writes to `public/uploads/{logos,products}` on local disk (`src/lib/upload.ts`, `sharp` via `src/lib/image-optimizer.ts`) — not suitable for serverless/multi-instance deploys as-is.
+
+### Electron
+
+`electron/main.js` loads `localhost:3000` in dev and `out/index.html` in production, but `next.config.ts` has no static export configured, so `electron:build` is not functional yet.

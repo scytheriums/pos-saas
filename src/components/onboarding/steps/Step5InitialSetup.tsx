@@ -4,6 +4,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Rocket, Plus, UserPlus } from 'lucide-react';
@@ -105,11 +106,12 @@ export function Step5InitialSetup({ form }: Step5Props) {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormControl>
-                                                <Input
-                                                    type="number"
+                                                <CurrencyInput
                                                     placeholder="Price"
-                                                    {...field}
-                                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                                    name={field.name}
+                                                    onBlur={field.onBlur}
+                                                    value={Number(field.value) || null}
+                                                    onValueChange={(v) => field.onChange(v ?? 0)}
                                                 />
                                             </FormControl>
                                             <FormMessage />

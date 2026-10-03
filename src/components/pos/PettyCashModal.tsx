@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -99,13 +100,10 @@ export function PettyCashModal({ open, shift, onClose, onSuccess }: PettyCashMod
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label htmlFor="payout-amount">Amount (Rp)</Label>
-              <Input
+              <CurrencyInput
                 id="payout-amount"
-                type="number"
-                min="1"
-                placeholder="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={amount ? parseFloat(amount) : null}
+                onValueChange={(v) => setAmount(v === null ? "" : String(v))}
                 autoFocus
               />
             </div>

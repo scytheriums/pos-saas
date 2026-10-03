@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -76,13 +77,10 @@ export function OpenShiftModal({ open, onShiftOpened }: OpenShiftModalProps) {
         <div className="space-y-4 py-2">
           <div className="space-y-1">
             <Label htmlFor="opening-float">Opening Float (Rp)</Label>
-            <Input
+            <CurrencyInput
               id="opening-float"
-              type="number"
-              min="0"
-              placeholder="0"
-              value={openingFloat}
-              onChange={(e) => setOpeningFloat(e.target.value)}
+              value={openingFloat ? parseFloat(openingFloat) : null}
+              onValueChange={(v) => setOpeningFloat(v === null ? "" : String(v))}
             />
             <p className="text-xs text-muted-foreground">
               Amount of cash in the drawer at the start of this shift.
@@ -244,13 +242,10 @@ export function CloseShiftModal({
           )}
           <div className="space-y-1">
             <Label htmlFor="actual-cash">Actual Cash Count (Rp)</Label>
-            <Input
+            <CurrencyInput
               id="actual-cash"
-              type="number"
-              min="0"
-              placeholder="0"
-              value={actualCash}
-              onChange={(e) => setActualCash(e.target.value)}
+              value={actualCash ? parseFloat(actualCash) : null}
+              onValueChange={(v) => setActualCash(v === null ? "" : String(v))}
             />
           </div>
           {difference !== null && (

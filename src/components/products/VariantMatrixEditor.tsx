@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, X, AlertCircle, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 interface OptionValue {
     id: string;
@@ -35,23 +36,20 @@ interface VariantMatrixEditorProps {
     variants: Variant[];
     onOptionsChange: (options: Option[]) => void;
     onVariantsChange: (variants: Variant[]) => void;
-    /** When true, hides the option-definition section and disables auto-generation. Use for edit mode. */
-    hideOptions?: boolean;
 }
 
 export function VariantMatrixEditor({
     options,
     variants,
     onOptionsChange,
-    onVariantsChange,
-    hideOptions = false
+    onVariantsChange
 }: VariantMatrixEditorProps) {
     const [newOptionName, setNewOptionName] = useState('');
     const [newOptionValues, setNewOptionValues] = useState<{ [key: string]: string }>({});
     const [skuSettings, setSkuSettings] = useState<{ autoGenerateSku: boolean; preview: string } | null>(null);
     const [showBulk, setShowBulk] = useState(false);
-    const [bulkPrice, setBulkPrice] = useState('');
-    const [bulkCost, setBulkCost] = useState('');
+    const [bulkPrice, setBulkPrice] = useState<number | null>(null);
+    const [bulkCost, setBulkCost] = useState<number | null>(null);
     const [bulkStock, setBulkStock] = useState('');
 
     // Keep a ref to variants so the options effect always reads the latest data
@@ -78,10 +76,9 @@ export function VariantMatrixEditor({
         fetchSkuSettings();
     }, []);
 
-    // Generate variants when options change, preserving any edits already made.
-    // Skipped in edit mode (hideOptions) since variants already exist in the DB.
+    // Generate variants when options change, preserving any edits already made
+    // (including variants already saved in the DB, matched by option value IDs).
     useEffect(() => {
-        if (hideOptions) return;
         if (options.length > 0 && options.every(opt => opt.values.length > 0)) {
             const newVariants = generateVariantCombinations(options);
 
@@ -99,7 +96,7 @@ export function VariantMatrixEditor({
             onVariantsChange([]);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [options, hideOptions]);
+    }, [options]);
 
     const generateVariantCombinations = (opts: Option[]): Variant[] => {
         if (opts.length === 0) return [];
@@ -198,14 +195,14 @@ export function VariantMatrixEditor({
     };
 
     const applyBulkPrice = () => {
-        const val = parseFloat(bulkPrice);
-        if (isNaN(val)) return;
+        const val = bulkPrice;
+        if (val === null) return;
         onVariantsChange(variants.map(v => ({ ...v, price: val })));
     };
 
     const applyBulkCost = () => {
-        const val = parseFloat(bulkCost);
-        if (isNaN(val)) return;
+        const val = bulkCost;
+        if (val === null) return;
         onVariantsChange(variants.map(v => ({ ...v, cost: val })));
     };
 
@@ -224,8 +221,7 @@ export function VariantMatrixEditor({
                 <CardTitle className="text-base">Variant Configuration</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                {/* Option Definition — hidden in edit mode */}
-                {!hideOptions && (
+                {/* Option Definition */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <Label className="text-sm font-medium">Product Options</Label>
@@ -302,7 +298,6 @@ export function VariantMatrixEditor({
                         </Card>
                     ))}
                 </div>
-                )}
 
                 {/* Variant Matrix */}
                 {variants.length > 0 && (
@@ -332,12 +327,10 @@ export function VariantMatrixEditor({
                                     <div className="space-y-1">
                                         <Label className="text-xs">Price (Rp)</Label>
                                         <div className="flex gap-1">
-                                            <Input
+                                            <CurrencyInput
                                                 className="h-8 text-sm"
-                                                type="number"
-                                                placeholder="0"
                                                 value={bulkPrice}
-                                                onChange={e => setBulkPrice(e.target.value)}
+                                                onValueChange={setBulkPrice}
                                             />
                                             <Button type="button" size="sm" className="h-8 px-2" onClick={applyBulkPrice}>✓</Button>
                                         </div>
@@ -345,12 +338,10 @@ export function VariantMatrixEditor({
                                     <div className="space-y-1">
                                         <Label className="text-xs">Cost (Rp)</Label>
                                         <div className="flex gap-1">
-                                            <Input
+                                            <CurrencyInput
                                                 className="h-8 text-sm"
-                                                type="number"
-                                                placeholder="0"
                                                 value={bulkCost}
-                                                onChange={e => setBulkCost(e.target.value)}
+                                                onValueChange={setBulkCost}
                                             />
                                             <Button type="button" size="sm" className="h-8 px-2" onClick={applyBulkCost}>✓</Button>
                                         </div>
@@ -418,7 +409,7 @@ export function VariantMatrixEditor({
                                             </Label>
                                             <Input
                                                 className="h-8 text-sm"
-                                                value={skuSettings?.autoGenerateSku ? skuSettings.preview : variant.sku}
+                                                value={skuSettings?.autoGenerateSku ? (variant.sku || skuSettings.preview) : variant.sku}
                                                 onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
                                                 placeholder={skuSettings?.autoGenerateSku ? 'Auto-generated' : 'SKU'}
                                                 required={!skuSettings?.autoGenerateSku}
@@ -439,25 +430,18 @@ export function VariantMatrixEditor({
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Price (Rp) *</Label>
-                                            <Input
+                                            <CurrencyInput
                                                 className="h-8 text-sm"
-                                                type="number"
                                                 value={variant.price}
-                                                onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
-                                                min={0}
-                                                step={0.01}
-                                                required
+                                                onValueChange={(v) => updateVariant(variant.id, 'price', v ?? 0)}
                                             />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Cost (Rp)</Label>
-                                            <Input
+                                            <CurrencyInput
                                                 className="h-8 text-sm"
-                                                type="number"
                                                 value={variant.cost}
-                                                onChange={(e) => updateVariant(variant.id, 'cost', parseFloat(e.target.value) || 0)}
-                                                min={0}
-                                                step={0.01}
+                                                onValueChange={(v) => updateVariant(variant.id, 'cost', v ?? 0)}
                                             />
                                         </div>
                                     </div>
